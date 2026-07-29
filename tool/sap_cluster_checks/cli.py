@@ -1948,6 +1948,9 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             "    SAP HANA SR:     https://help.sap.com/docs/SAP_HANA_PLATFORM/6b94445c94ae495c83a19646e7c3fd56"
         )
         print(f"    Red Hat HA:      {doc_urls['ha_clusters']}")
+        print(f"    Scale-Up HA:     {doc_urls['sap_scale_up']}")
+        print(f"    Scale-Out HA:    {doc_urls['sap_scale_out']}")
+        print(f"    Multitarget DR:  {doc_urls['sap_multitarget_dr']}")
         print("    Pacemaker:       https://clusterlabs.org/pacemaker/doc/")
 
         print("\n" + "-" * 63)

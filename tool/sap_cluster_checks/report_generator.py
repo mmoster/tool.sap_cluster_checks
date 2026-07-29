@@ -1456,6 +1456,9 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         ),
         ("Red Hat HA Clusters", doc_urls["ha_clusters"]),
         ("Red Hat SAP Solutions", doc_urls["sap_solutions"]),
+        ("Red Hat SAP HANA Scale-Up HA", doc_urls["sap_scale_up"]),
+        ("Red Hat SAP HANA Scale-Out HA", doc_urls["sap_scale_out"]),
+        ("Red Hat SAP HANA Multitarget DR", doc_urls["sap_multitarget_dr"]),
         ("Pacemaker Documentation", "https://clusterlabs.org/pacemaker/doc/"),
     ]
 

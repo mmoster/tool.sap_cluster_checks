@@ -35,6 +35,7 @@ def get_redhat_doc_urls(rhel_major: int = 9) -> dict:
     else:
         scale_up = f"{sap_guide_base}/html/deploying_sap_hana_scale-up_system_replication_high_availability/"
         scale_out = f"{sap_guide_base}/html/deploying_sap_hana_scale-out_system_replication_high_availability/"
+    multitarget_dr = f"{sap_guide_base}/html/configuring_sap_hana_scale-up_multitarget_system_replication_for_disaster_recovery/"
     return {
         "ha_clusters": f"{ha}/",
         "ha_quorum": f"{ha}/assembly_configuring-cluster-quorum-configuring-and-managing-high-availability-clusters",
@@ -42,6 +43,7 @@ def get_redhat_doc_urls(rhel_major: int = 9) -> dict:
         "sap_solutions": f"{sap_base}/",
         "sap_scale_up": scale_up,
         "sap_scale_out": scale_out,
+        "sap_multitarget_dr": multitarget_dr,
     }
 
 
@@ -274,6 +276,15 @@ DOCUMENTATION
 
   Red Hat SAP HANA HA:
     {urls['sap_solutions']}
+
+  Red Hat SAP HANA Scale-Up HA:
+    {urls['sap_scale_up']}
+
+  Red Hat SAP HANA Scale-Out HA:
+    {urls['sap_scale_out']}
+
+  Red Hat SAP HANA Multitarget DR:
+    {urls['sap_multitarget_dr']}
 
   Pacemaker Documentation:
     https://clusterlabs.org/pacemaker/doc/
