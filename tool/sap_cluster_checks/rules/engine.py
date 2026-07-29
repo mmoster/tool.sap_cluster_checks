@@ -789,7 +789,8 @@ class RulesEngine:
         # Detect based on resource presence
         has_saphana = saphana_resource is not None
         has_controller = saphana_controller is not None
-        has_hana_resource = has_saphana or has_controller
+        has_topology = parsed.get("saphana_topology") is not None
+        has_hana_resource = has_saphana or has_controller or has_topology
         # Detect if location constraints exclude a node from HANA resources
         # This could indicate a majority maker (Scale-Out) OR an app server (Scale-Up)
         has_constraint_excluded_node = (
@@ -837,8 +838,9 @@ class RulesEngine:
 
         # Decision tree:
         # 1. HANA resources + clone-max → definitive type (clone-max >= 4 = Scale-Out, < 4 = Scale-Up)
-        # 2. No HANA resources → Unknown
-        # 3. node_count is informational, not required for type detection
+        # 2. No HANA resources + hdbnsutil data → inferred type from HANA topology
+        # 3. No HANA resources + no hdbnsutil → Unknown
+        # 4. node_count is informational, not required for type detection
         if not has_hana_resource:
             if node_count == 0:
                 cluster_type = "Not detected"
@@ -846,6 +848,22 @@ class RulesEngine:
             elif node_count == 1:
                 cluster_type = "Single Node"
                 message = "Single node configuration (no HA)"
+            elif hdbnsutil_host_count >= 2:
+                cluster_type = "Scale-Out"
+                details["inferred_from_hana_topology"] = True
+                message = (
+                    f"Scale-Out configuration inferred from HANA topology "
+                    f"({hdbnsutil_host_count} hosts per site, {node_count} cluster nodes) "
+                    f"- no SAPHana/SAPHanaController resources in CIB"
+                )
+            elif hdbnsutil_host_count == 1:
+                cluster_type = "Scale-Up"
+                details["inferred_from_hana_topology"] = True
+                message = (
+                    f"Scale-Up configuration inferred from HANA topology "
+                    f"(1 host per site, {node_count} cluster nodes) "
+                    f"- no SAPHana/SAPHanaController resources in CIB"
+                )
             else:
                 cluster_type = "Unknown"
                 message = f"Cluster detected ({node_count} nodes) but no SAP HANA resources found"
