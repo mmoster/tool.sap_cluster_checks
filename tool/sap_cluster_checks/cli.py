@@ -2697,14 +2697,14 @@ Examples:
         print("  [4] Show configuration")
         if generate_pdf:
             print("  [5] Save PDF report (custom filename)")
+        else:
+            print("  (5) Save PDF report (requires fpdf2)")
         print("  [6] Show suggestions")
         print("  [7] Reset configuration (delete cached discovery)")
         if generate_pdf:
             print("  [q] Save PDF and quit")
         else:
             print("  [q] Quit")
-        if not generate_pdf:
-            print("  (PDF options hidden - fpdf2 not installed)")
         print("-" * 63)
         try:
             import select as _select
