@@ -2715,7 +2715,10 @@ Examples:
             if ready:
                 choice = sys.stdin.readline().strip().lower()
                 return choice if choice else "1"  # Default to installation status
-            print("\n  No response, saving PDF and exiting.")
+            if generate_pdf:
+                print("\n  No response, saving PDF and exiting.")
+            else:
+                print("\n  No response, exiting.")
             return "q"
         except (EOFError, KeyboardInterrupt):
             return "q"
