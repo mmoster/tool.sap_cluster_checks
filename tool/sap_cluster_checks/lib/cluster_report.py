@@ -75,7 +75,7 @@ except ImportError:
 
 
 # Report format version for backwards compatibility
-REPORT_VERSION = "1.0"
+REPORT_VERSION = "1.0.0"
 
 
 @dataclass

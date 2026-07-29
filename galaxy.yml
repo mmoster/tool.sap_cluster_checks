@@ -3,7 +3,7 @@
 # and it is not intended for actual publishing.
 namespace: tool
 name: sap_cluster_checks
-version: 0.1.0
+version: 1.0.0
 readme: README.md
 authors:
   - Markus Moster <markus.moster@redhat.com>
