@@ -511,10 +511,17 @@ class InstallStatusMixin:
             "pcs stonith status 2>/dev/null", node, method, user
         )
         if success:
-            status["stonith_configured"] = "Started" in output
             if "NO stonith" in output or "no stonith" in output.lower():
                 status["stonith_configured"] = False
                 status["stonith_enabled"] = False
+            elif "Started" in output:
+                status["stonith_configured"] = True
+            elif "Stopped" in output or "disabled" in output.lower():
+                # STONITH device exists but is disabled/stopped
+                status["stonith_configured"] = False
+                status["stonith_disabled"] = True
+            else:
+                status["stonith_configured"] = False
 
         # Check HANA installed
         success, output = self._execute_check_cmd(

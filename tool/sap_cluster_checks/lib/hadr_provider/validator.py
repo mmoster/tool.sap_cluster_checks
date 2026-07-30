@@ -26,6 +26,20 @@ from .suggestions import (
 class HadrValidator:
     """Validate HA/DR provider hook configuration."""
 
+    @staticmethod
+    def _ci_get(sections: Dict[str, Dict[str, str]], key: str):
+        """Case-insensitive lookup in a section dictionary.
+
+        HANA global.ini section names are case-insensitive, so
+        [ha_dr_provider_HanaSR] and [ha_dr_provider_hanasr] are equivalent.
+        Returns (actual_key, value) or (None, None).
+        """
+        key_lower = key.lower()
+        for k, v in sections.items():
+            if k.lower() == key_lower:
+                return k, v
+        return None, None
+
     def validate(self, actual: ActualConfig, expected: ExpectedConfig) -> List[Finding]:
         """Compare actual vs expected config and return all findings.
 
@@ -52,7 +66,9 @@ class HadrValidator:
         findings: List[Finding] = []
 
         for hook in expected.hooks:
-            section = actual.global_ini_sections.get(hook.section_name)
+            _actual_name, section = self._ci_get(
+                actual.global_ini_sections, hook.section_name
+            )
 
             if section is None:
                 severity = "WARNING" if hook.is_optional else "CRITICAL"
@@ -159,7 +175,10 @@ class HadrValidator:
             chksrv_hook = next((h for h in expected.hooks if h.is_optional), None)
             if chksrv_hook and key.endswith("chksrv"):
                 # Only check this trace entry if the optional hook is present
-                if chksrv_hook.section_name not in actual.global_ini_sections:
+                _name, _sec = self._ci_get(
+                    actual.global_ini_sections, chksrv_hook.section_name
+                )
+                if _sec is None:
                     continue
 
             actual_val = actual.trace_settings.get(key)
@@ -279,7 +298,10 @@ class HadrValidator:
                 "ha_dr_provider_suschksrv",
             ]
             for legacy_name in legacy_sections:
-                if legacy_name in actual.global_ini_sections:
+                actual_name, _sec = self._ci_get(
+                    actual.global_ini_sections, legacy_name
+                )
+                if actual_name is not None:
                     desc, cmd = generate_fix_for_wrong_arch_hooks(
                         expected.arch_type, legacy_name, actual.sid
                     )
@@ -307,7 +329,10 @@ class HadrValidator:
                 "ha_dr_provider_chksrv",
             ]
             for angi_name in angi_sections:
-                if angi_name in actual.global_ini_sections:
+                actual_name, _sec = self._ci_get(
+                    actual.global_ini_sections, angi_name
+                )
+                if actual_name is not None:
                     desc, cmd = generate_fix_for_wrong_arch_hooks(
                         expected.arch_type, angi_name, actual.sid
                     )

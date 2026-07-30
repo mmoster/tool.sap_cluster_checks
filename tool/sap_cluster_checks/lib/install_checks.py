@@ -83,6 +83,7 @@ def make_status_dict(node: str = None, method: str = None) -> dict:
         # Phase 3: Fencing & Resources
         "stonith_enabled": None,
         "stonith_configured": None,
+        "stonith_disabled": False,
         "hana_installed": None,
         "hana_resources": None,
         # Details

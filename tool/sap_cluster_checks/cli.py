@@ -1075,10 +1075,10 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
         if excluded_nodes_updated:
             print(
-                f"[OK] Nodes excluded from HANA by constraints: {', '.join(excluded_nodes_updated)}"
+                f"  [OK] Nodes excluded from HANA by constraints: {', '.join(excluded_nodes_updated)}"
             )
         if other_without_hana:
-            print(f"[INFO] Nodes without HANA: {', '.join(other_without_hana)}")
+            print(f"  [INFO] Nodes without HANA: {', '.join(other_without_hana)}")
 
         # Filter nodes to only those with HANA installed (for subsequent phases)
         if nodes_with_hana:
@@ -1194,6 +1194,16 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         print(f"    - Warning:         {len(warnings)}")
         print(f"  Skipped:             {skipped}")
         print(f"  Errors:              {errors}")
+
+        if skipped:
+            skipped_results = [
+                r for r in self.check_results if r.status == CheckStatus.SKIPPED
+            ]
+            print("\n  SKIPPED CHECKS:")
+            for r in skipped_results:
+                reason = r.message or "no reason given"
+                node_str = f" ({r.node})" if r.node and r.node != "all" else ""
+                print(f"    [SKIP] {r.check_id}{node_str}: {reason}")
 
         if critical_failures:
             print("\n  CRITICAL FAILURES:")
@@ -1601,7 +1611,21 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
         failed = [step for step, success in results.items() if not success]
         if failed:
-            print(f"\n[WARNING] Failed steps: {', '.join(failed)}")
+            failed_labels = [step_names.get(s, s) for s in failed]
+            print(f"\n[WARNING] Steps with failures: {', '.join(failed_labels)}")
+            # Show which checks actually failed in each step
+            for step in failed:
+                if step in step_checks and self.check_results:
+                    check_ids = step_checks[step]
+                    failed_checks = [
+                        r for r in self.check_results
+                        if r.check_id in check_ids
+                        and r.status == CheckStatus.FAILED
+                    ]
+                    for r in failed_checks:
+                        sev = "CRIT" if r.severity == Severity.CRITICAL else "WARN"
+                        node_str = f" ({r.node})" if r.node else ""
+                        print(f"  [{sev}] {r.check_id}{node_str}: {r.message}")
 
         # Save step results for --suggest to use
         status_file = self.config_dir / "last_run_status.yaml"
@@ -1746,7 +1770,10 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 if not install_status.get("cluster_configured"):
                     missing_steps.append("cluster")
                 if not install_status.get("stonith_configured"):
-                    missing_steps.append("stonith")
+                    if install_status.get("stonith_disabled"):
+                        missing_steps.append("stonith (device disabled!)")
+                    else:
+                        missing_steps.append("stonith")
                 if not install_status.get("hana_resources"):
                     missing_steps.append("hana_resources")
             except Exception:
@@ -1918,11 +1945,23 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
   ╚═══════════════════════════════════════════════════════════════╝
 """)
             elif critical:
+                # Build context-aware hints based on actual failures
+                hints = ["Check the report file for details"]
+                critical_ids = {r.check_id for r in critical if hasattr(r, "check_id")}
+                if any("STONITH" in cid or "FENCING" in cid for cid in critical_ids):
+                    hints.append("Address STONITH/fencing issues")
+                if any("QUORUM" in cid for cid in critical_ids):
+                    hints.append("Verify quorum configuration")
+                if any("HADR" in cid or "HOOK" in cid for cid in critical_ids):
+                    hints.append("Fix HA/DR provider hook configuration in global.ini")
+                if any("RESOURCE" in cid for cid in critical_ids):
+                    hints.append("Check Pacemaker resource configuration")
+                if any("COROSYNC" in cid for cid in critical_ids):
+                    hints.append("Review Corosync configuration")
+                hint_lines = "\n".join(f"    - {h}" for h in hints)
                 print(f"""
   CRITICAL issues found ({len(critical)}). Review:
-    - Check the report file for details
-    - Address STONITH/fencing issues first
-    - Verify quorum configuration
+{hint_lines}
 """)
 
             if warnings and not packages_missing:

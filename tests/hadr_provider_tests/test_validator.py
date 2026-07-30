@@ -208,6 +208,72 @@ class TestMissingTrace:
         assert all(f.severity == 'WARNING' for f in trace_findings)
 
 
+class TestCaseInsensitiveSections:
+    """Section names in global.ini are case-insensitive for HANA."""
+
+    def test_angi_mixed_case_sections(self):
+        """[ha_dr_provider_HanaSR] should match expected [ha_dr_provider_hanasr]."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_HanaSR]\n"
+                "provider = HanaSR\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "\n"
+                "[ha_dr_provider_ChkSrv]\n"
+                "provider = ChkSrv\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 2\n"
+                "action_on_lost = stop\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_hanasr = info\n"
+                "ha_dr_chksrv = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_angi.txt').read_text(),
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        global_ini_findings = [f for f in findings if f.category == 'global_ini']
+        assert len(global_ini_findings) == 0, (
+            f"Expected no global_ini findings but got: "
+            f"{[f.what_is_wrong for f in global_ini_findings]}"
+        )
+
+    def test_legacy_mixed_case_sections(self):
+        """Mixed case legacy sections should still be recognized."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_saphanasr]\n"
+                "provider = SAPHanaSR\n"
+                "path = /usr/share/SAPHanaSR\n"
+                "execution_order = 1\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_saphanasr = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_legacy.txt').read_text(),
+            provider_files='/usr/share/SAPHanaSR/SAPHanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(8, Topology.SCALE_UP, ArchType.LEGACY, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        # Main hook section should be found (no CRITICAL missing-section findings)
+        missing_critical = [
+            f for f in findings
+            if 'missing from global.ini' in f.what_is_wrong
+            and f.severity == 'CRITICAL'
+        ]
+        assert len(missing_critical) == 0, (
+            f"Expected no CRITICAL missing section findings but got: "
+            f"{[f.what_is_wrong for f in missing_critical]}"
+        )
+
+
 class TestFindingSuggestions:
     """Verify all findings have non-empty fix descriptions and commands."""
 

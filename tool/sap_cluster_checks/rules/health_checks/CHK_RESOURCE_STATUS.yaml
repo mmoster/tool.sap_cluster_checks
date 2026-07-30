@@ -30,12 +30,14 @@ source_definitions:
     if [ -n "$HANA_LINES" ]; then
       if echo "$HANA_LINES" | grep -qi 'unmanaged'; then
         echo "HANA_RESOURCE_STATE=unmanaged"
+      elif echo "$HANA_LINES" | grep -qiE 'Started|Master|Slave|Promoted|Unpromoted'; then
+        # Running takes precedence: ancillary resources (SAPHanaFil) may be
+        # disabled while the core controller resource is still operational.
+        echo "HANA_RESOURCE_STATE=running"
       elif echo "$HANA_LINES" | grep -qiE 'target-role.*Stopped|Stopped.*disabled|\(disabled\)'; then
         echo "HANA_RESOURCE_STATE=disabled"
-      elif echo "$HANA_LINES" | grep -qiE 'Stopped|FAILED' && ! echo "$HANA_LINES" | grep -qiE 'Started|Master|Slave|Promoted|Unpromoted'; then
+      elif echo "$HANA_LINES" | grep -qiE 'Stopped|FAILED'; then
         echo "HANA_RESOURCE_STATE=stopped"
-      elif echo "$HANA_LINES" | grep -qiE 'Started|Master|Slave|Promoted|Unpromoted'; then
-        echo "HANA_RESOURCE_STATE=running"
       else
         echo "HANA_RESOURCE_STATE=unknown"
       fi
