@@ -8,38 +8,7 @@ Dataclass definitions for access discovery:
 
 from typing import Dict, Optional
 
-# Python 3.6 compatibility for dataclasses
-try:
-    from dataclasses import dataclass, asdict  # pylint: disable=unused-import  # noqa: F401 - re-exported
-except ImportError:
-    # Fallback for Python < 3.7
-    def field(default=None, default_factory=None):
-        return default_factory() if default_factory else default
-
-    def dataclass(cls):
-        """Simple dataclass decorator fallback"""
-
-        def __init__(self, **kwargs):
-            # Set defaults from class annotations first
-            if hasattr(cls, "__annotations__"):
-                for name in cls.__annotations__:
-                    default = getattr(cls, name, None)
-                    setattr(self, name, default)
-            # Override with provided kwargs
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-            # Call __post_init__ if defined
-            if hasattr(self, "__post_init__"):
-                self.__post_init__()
-
-        cls.__init__ = __init__
-        return cls
-
-    def asdict(obj):
-        """Simple asdict fallback"""
-        if hasattr(obj, "__dict__"):
-            return {k: v for k, v in obj.__dict__.items() if not k.startswith("_")}
-        return obj
+from ..lib.compat import dataclass, asdict  # noqa: F401 - asdict re-exported for discover_access
 
 
 @dataclass

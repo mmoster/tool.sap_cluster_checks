@@ -7,6 +7,7 @@ Supports both live command execution and SOSreport parsing.
 
 import os
 import re
+import shlex
 import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from enum import Enum
@@ -17,32 +18,7 @@ import yaml
 
 from ..lib import CIBParser
 
-# Python 3.6 compatibility for dataclasses
-try:
-    from dataclasses import dataclass
-except ImportError:
-    # Fallback for Python < 3.7
-    def field(default=None, default_factory=None):
-        return default_factory() if default_factory else default
-
-    def dataclass(cls):
-        """Simple dataclass decorator fallback"""
-
-        def __init__(self, **kwargs):
-            # Set defaults from class annotations first
-            if hasattr(cls, "__annotations__"):
-                for name in cls.__annotations__:
-                    default = getattr(cls, name, None)
-                    setattr(self, name, default)
-            # Override with provided kwargs
-            for key, value in kwargs.items():
-                setattr(self, key, value)
-            # Call __post_init__ if defined
-            if hasattr(self, "__post_init__"):
-                self.__post_init__()
-
-        cls.__init__ = __init__
-        return cls
+from ..lib.compat import dataclass
 
 
 class Severity(Enum):
@@ -525,7 +501,7 @@ class RulesEngine:
                 # Insert -f cib.xml after 'pcs'
                 # Handle: pcs property -> pcs -f /path/cib.xml property
                 # Also handle: pcs resource config -> pcs -f /path/cib.xml resource config
-                transformed = cmd.replace(pcs_cmd, f"pcs -f {self.CIB_PATH} {pcs_cmd.split()[1]}")
+                transformed = cmd.replace(pcs_cmd, f"pcs -f {self.CIB_PATH} {pcs_cmd.split()[1]}", 1)
                 return transformed
 
         return None  # Command cannot be transformed
@@ -543,7 +519,7 @@ class RulesEngine:
                     cmd = f"sudo {cmd}"
                 escaped_cmd = cmd.replace("'", "'\"'\"'")
                 full_cmd = (
-                    f"ssh -o BatchMode=yes -o ConnectTimeout=10 {ssh_user}@{node} '{escaped_cmd}'"
+                    f"ssh -o BatchMode=yes -o ConnectTimeout=10 {shlex.quote(f'{ssh_user}@{node}')} '{escaped_cmd}'"
                 )
             elif node and method == "ansible":
                 escaped_cmd = cmd.replace("'", "'\"'\"'")

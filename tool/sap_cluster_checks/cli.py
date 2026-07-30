@@ -21,15 +21,7 @@ import threading
 from pathlib import Path
 from datetime import datetime
 
-try:
-    from dataclasses import asdict
-except ImportError:
-    # Python < 3.7 fallback
-    def asdict(obj):
-        """Simple fallback for dataclasses.asdict"""
-        if hasattr(obj, "__dict__"):
-            return {k: v for k, v in obj.__dict__.items() if not k.startswith("_")}
-        return obj
+from .lib.compat import asdict
 
 
 import yaml
@@ -1390,22 +1382,22 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             passed = [
                 r
                 for r in all_results
-                if hasattr(r, "status") and str(r.status) == "CheckStatus.PASSED"
+                if hasattr(r, "status") and r.status == CheckStatus.PASSED
             ]
             failed_checks = [
                 r
                 for r in all_results
-                if hasattr(r, "status") and str(r.status) == "CheckStatus.FAILED"
+                if hasattr(r, "status") and r.status == CheckStatus.FAILED
             ]
             skipped = [
                 r
                 for r in all_results
-                if hasattr(r, "status") and str(r.status) == "CheckStatus.SKIPPED"
+                if hasattr(r, "status") and r.status == CheckStatus.SKIPPED
             ]
             errors = [
                 r
                 for r in all_results
-                if hasattr(r, "status") and str(r.status) == "CheckStatus.ERROR"
+                if hasattr(r, "status") and r.status == CheckStatus.ERROR
             ]
 
             print("\nHealth Check Results:")
@@ -1476,7 +1468,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 print("-" * 63)
                 print(" Failed Checks (CRITICAL issues):")
                 for r in failed_checks:
-                    if hasattr(r, "severity") and str(r.severity) == "Severity.CRITICAL":
+                    if hasattr(r, "severity") and r.severity == Severity.CRITICAL:
                         print(f"  - {r.check_id}: {r.message}")
                 print("-" * 63)
 
@@ -1578,10 +1570,10 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             elif step in step_checks and self.check_results:
                 check_ids = step_checks[step]
                 step_results = [r for r in self.check_results if r.check_id in check_ids]
-                passed = sum(1 for r in step_results if str(r.status) == "CheckStatus.PASSED")
-                failed = sum(1 for r in step_results if str(r.status) == "CheckStatus.FAILED")
-                skipped = sum(1 for r in step_results if str(r.status) == "CheckStatus.SKIPPED")
-                errors = sum(1 for r in step_results if str(r.status) == "CheckStatus.ERROR")
+                passed = sum(1 for r in step_results if r.status == CheckStatus.PASSED)
+                failed = sum(1 for r in step_results if r.status == CheckStatus.FAILED)
+                skipped = sum(1 for r in step_results if r.status == CheckStatus.SKIPPED)
+                errors = sum(1 for r in step_results if r.status == CheckStatus.ERROR)
                 total = len(step_results)
 
                 if self.debug:
@@ -1832,22 +1824,22 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 r
                 for r in all_results
                 if hasattr(r, "status")
-                and str(r.status) == "CheckStatus.FAILED"
+                and r.status == CheckStatus.FAILED
                 and hasattr(r, "severity")
-                and str(r.severity) == "Severity.CRITICAL"
+                and r.severity == Severity.CRITICAL
             ]
             warnings = [
                 r
                 for r in all_results
                 if hasattr(r, "status")
-                and str(r.status) == "CheckStatus.FAILED"
+                and r.status == CheckStatus.FAILED
                 and hasattr(r, "severity")
-                and str(r.severity) == "Severity.WARNING"
+                and r.severity == Severity.WARNING
             ]
             skipped = [
                 r
                 for r in all_results
-                if hasattr(r, "status") and str(r.status) == "CheckStatus.SKIPPED"
+                if hasattr(r, "status") and r.status == CheckStatus.SKIPPED
             ]
 
             # Check for essential package/command not found issues
@@ -1870,7 +1862,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             errors = [
                 r
                 for r in all_results
-                if hasattr(r, "status") and str(r.status) == "CheckStatus.ERROR"
+                if hasattr(r, "status") and r.status == CheckStatus.ERROR
             ]
             cluster_not_running = False
             cluster_not_created = False
@@ -2312,40 +2304,9 @@ Examples:
 
                 if behind_int > 0:
                     print(
-                        f"\n[INFO] A newer version is available ({behind_count} commit(s) behind)"
+                        f"\n[INFO] A newer version is available ({behind_count} commit(s) behind)."
                     )
-                    try:
-                        import select as _select
-
-                        sys.stdout.write("  Update to latest version? [y/N] (auto-skip in 20s): ")
-                        sys.stdout.flush()
-                        ready, _wlist, _xlist = _select.select([sys.stdin], [], [], 20)
-                        if ready:
-                            response = sys.stdin.readline().strip().lower()
-                        else:
-                            response = ""
-                            print("\n  No response, skipping update.")
-                        if response in ("y", "yes"):
-                            print("  Updating...")
-                            result = subprocess.run(
-                                ["git", "pull"],
-                                cwd=SCRIPT_DIR,
-                                capture_output=True,
-                                text=True,
-                                timeout=60,
-                                check=False,
-                            )
-                            if result.returncode == 0:
-                                print("  Updated successfully. Restarting health check...\n")
-                                # Restart the script with the same arguments
-                                os.execv(
-                                    sys.executable,
-                                    [sys.executable] + sys.argv + ["--no-update-check"],
-                                )
-                            else:
-                                print(f"  [WARN] Update failed: {result.stderr.strip()}")
-                    except (EOFError, KeyboardInterrupt):
-                        print("\n  Skipping update.")
+                    print("  To update, run: git pull")
         except Exception:
             pass  # Silently ignore any errors in update check
 

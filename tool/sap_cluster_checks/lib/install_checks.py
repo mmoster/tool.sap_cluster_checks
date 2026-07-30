@@ -6,6 +6,7 @@ Provides CommandExecutor for running commands on nodes and make_status_dict()
 for creating the standard status dictionary template.
 """
 
+import shlex
 import subprocess
 
 
@@ -26,7 +27,7 @@ class CommandExecutor:
                 ssh_user = user or "root"
                 escaped_cmd = cmd.replace("'", "'\"'\"'")
                 full_cmd = (
-                    f"ssh -o BatchMode=yes -o ConnectTimeout=10 {ssh_user}@{node} '{escaped_cmd}'"
+                    f"ssh -o BatchMode=yes -o ConnectTimeout=10 {shlex.quote(f'{ssh_user}@{node}')} '{escaped_cmd}'"
                 )
             else:
                 return False, "Unsupported method"

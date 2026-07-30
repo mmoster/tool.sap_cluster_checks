@@ -186,10 +186,11 @@ Health checks are classified as CRITICAL, WARNING, or INFO based on general best
 ## Security Considerations
 
 - The tool executes commands on cluster nodes via SSH or locally with the user's privileges
+- Node names and SSH usernames are sanitized with `shlex.quote()` before being interpolated into SSH commands to prevent shell injection
 - No credentials are stored by the tool itself — it relies on SSH keys or the current user session
 - SOSreport archives may contain sensitive data (hostnames, IP addresses, SAP SIDs, configuration details) and should be handled according to your organization's data handling policies
 - The `cluster_access_config.yaml` file stores discovered node information (hostnames, access methods) and should be treated as operational data
-- The tool checks for updates via `git fetch` against the public GitHub repository — this can be disabled with `--no-update-check`
+- The tool checks for updates via `git fetch` against the public GitHub repository and displays an informational message if a newer version is available — it does **not** auto-update or restart itself. This check can be disabled with `--no-update-check`
 
 ---
 
