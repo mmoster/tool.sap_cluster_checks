@@ -332,7 +332,7 @@ This is a one-line change. All report elements (headers, status badges, tables, 
 
 ## Extending Health Checks
 
-See [docs/EXTENDING_HEALTH_CHECKS.md](docs/EXTENDING_HEALTH_CHECKS.md) for details on creating custom health check rules.
+All 22 health checks are defined as YAML rule files — no Python code changes needed to add or modify checks. See [docs/EXTENDING_HEALTH_CHECKS.md](docs/EXTENDING_HEALTH_CHECKS.md) for details on adding new checks, updating existing ones (severity, expectations, regex patterns, scope), and the dispatch manifest reference.
 
 ## Requirements
 

@@ -134,6 +134,119 @@ Run the tool and check that your new check appears. The dispatch manifest is val
 
 ---
 
+## How to Update an Existing Health Check
+
+All modifications to existing checks are done by editing the corresponding `CHK_*.yaml` file. No Python changes are needed unless the check uses `custom_check`.
+
+### Change Severity
+
+Edit the top-level `severity` field:
+
+```yaml
+# Before
+severity: WARNING
+
+# After
+severity: CRITICAL
+```
+
+You can also override severity for individual expectations without changing the rule-level default:
+
+```yaml
+expectations:
+  - key: stonith_disabled
+    operator: not_exists
+    severity: WARNING  # This expectation warns instead of using rule's CRITICAL
+    message: "STONITH is disabled"
+```
+
+### Add or Modify Expectations
+
+Add new entries to the `expectations` list. Each expectation checks one parsed value:
+
+```yaml
+expectations:
+  # Existing expectation
+  - key: offline_nodes
+    operator: not_exists
+    message: "One or more cluster nodes are OFFLINE"
+  # New expectation added
+  - key: standby_nodes
+    operator: not_exists
+    severity: WARNING
+    message: "One or more nodes are in standby mode"
+```
+
+To modify an existing expectation, change any of its fields (`operator`, `value`, `message`, `severity`, `pass_message`).
+
+### Update Regex Patterns
+
+Modify patterns in `parser.search_patterns`. Each pattern extracts a named value from command output:
+
+```yaml
+search_patterns:
+  # Adjust regex to catch additional patterns
+  - name: offline_nodes
+    regex: "(OFFLINE|Offline:.*\\S|Standby)"  # Added Standby detection
+    group: 0
+```
+
+**Important:** If you add a new `name`, you can reference it in `validation_logic.expectations` via the `key` field. If you remove a `name`, remove any expectations that reference it.
+
+### Change Scope
+
+Update `validation_logic.scope` to change how the check is evaluated across nodes:
+
+```yaml
+validation_logic:
+  # Change from cluster-wide to per-node evaluation
+  scope: per_node
+```
+
+See [Scope Options](#scope-options) for available values.
+
+### Modify Source Commands
+
+Update what data is collected:
+
+```yaml
+source_definitions:
+  # Update the live command
+  live_cmd: "crm_mon -1 -r 2>/dev/null || pcs status 2>/dev/null"
+  # Update the SOSreport path
+  sos_path: "sos_commands/pacemaker/crm_mon_-1*"
+```
+
+When updating `live_cmd`, test the command on a representative system first. The command runs on each node (for `per_node` scope) or on one node (for `cluster` scope).
+
+### Enable or Disable a Check
+
+```yaml
+# Temporarily disable a check (remains in manifest but won't execute)
+enabled: false
+```
+
+### Change Dispatch Position
+
+To move a check to a different step, phase, or change its gate/topology filter, edit `rules/check_dispatch.yaml`:
+
+```yaml
+# Move check to a different phase or add a gate
+- check_id: CHK_YOUR_CHECK
+  gate: hana_installed        # Now only runs if HANA is installed
+  topology: [Scale-Up]        # Now only runs on Scale-Up clusters
+```
+
+### Checklist for Updates
+
+1. Edit the `CHK_*.yaml` file
+2. If regex patterns changed: verify the regex matches expected output
+3. If scope changed: consider whether expectations still make sense for the new scope
+4. If `live_cmd` changed: test on a live system or verify against SOSreport data
+5. Run the test suite: `cd tool.sap_cluster_checks && python -m pytest tests/ -v`
+
+---
+
 ## Dispatch Manifest Reference
 
 ### Steps and Phases
@@ -187,6 +300,7 @@ Available gates:
 |------|-----------|
 | `hana_installed` | At least one node has HANA installed |
 | `hana_resource_running` | HANA resource is active in Pacemaker |
+| `not_legacy_scaleup` | Cluster is NOT a legacy Scale-Up (skips checks not applicable to older setups) |
 
 When a gate is closed, affected checks are recorded as SKIPPED.
 
