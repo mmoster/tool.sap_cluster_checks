@@ -394,7 +394,7 @@ Access methods:
 ## Disclaimer
 
 > **Supported Platforms**<br>
-> This tool is designed for and tested on Red Hat Enterprise Linux for SAP Solutions 8.x, 9.x, and 10.x. SUSE Linux Enterprise Server (SLES) for SAP Applications is not supported in this version. It might be supportable with minor changes, but it is not supported.
+> This tool is designed for and tested on Red Hat Enterprise Linux for SAP Solutions 8.x, 9.x, and 10.x. SUSE Linux Enterprise Server (SLES) for SAP Applications is **not supported**.
 
 > **Testing Coverage**<br>
 > Health checks are validated against SAP and Red Hat best practice documentation. Not every combination of SAP HANA version, RHEL version, CPU architecture (x86_64, ppc64le, aarch64), cluster topology, and resource agent package can be covered. Results should be verified against the applicable Red Hat and SAP documentation for your specific environment.

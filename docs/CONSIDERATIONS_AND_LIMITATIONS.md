@@ -9,19 +9,25 @@ This document describes the design boundaries, known constraints, and operationa
 ### Supported Operating Systems
 
 - **Red Hat Enterprise Linux for SAP Solutions** 8.x, 9.x, and 10.x
-- **SUSE Linux Enterprise Server for SAP Applications** (SLES for SAP) — the health checks should generally work on SLES as well, since both platforms use the same underlying Pacemaker/Corosync cluster stack. Some areas may need minor updates (e.g., `pcs` vs `crmsh` CLI differences, package naming).
-- Other Linux distributions (Debian, Ubuntu, Oracle Linux, etc.) are **not supported**
 
-The tool relies on components such as:
+The tool relies on RHEL-specific components:
 - `pcs` CLI for cluster management queries
 - `subscription-manager` for entitlement validation
 - `/etc/redhat-release` for OS version detection
 - Red Hat package naming conventions (`resource-agents-sap-hana`, `sap-hana-ha`)
 
+### Unsupported Operating Systems
+
+The following operating systems are **not supported**:
+
+- **SUSE Linux Enterprise Server for SAP Applications** (SLES for SAP) — not supported. SLES uses different cluster management tooling (`crmsh` instead of `pcs`), different package names (`SAPHanaSR`, `SAPHanaSR-ScaleOut`), and different OS detection mechanisms (`/etc/os-release`, `/etc/SuSE-release`). These differences make SLES incompatible with this tool in its current version.
+- **Other Linux distributions** (Debian, Ubuntu, Oracle Linux, etc.) — not supported.
+
 ### Supported Cluster Stack
 
-- **Pacemaker/Corosync** with the `pcs` CLI or `crmsh`
+- **Pacemaker/Corosync** with the `pcs` CLI (Red Hat)
 - Other cluster frameworks (Veritas, Windows Server Failover Clustering, etc.) are not applicable
+- **Note:** Pacemaker/Corosync with `crmsh` (SUSE) is **not supported** — this tool requires the `pcs` CLI
 
 ---
 
@@ -115,7 +121,7 @@ To ensure maximum coverage, use the built-in SOSreport collection workflow:
 ### What Cannot Be Exhaustively Tested
 
 It is not feasible to test every combination of:
-- RHEL version (8.x, 9.x, 10.x) and minor release, SLES versions
+- RHEL version (8.x, 9.x, 10.x) and minor release
 - CPU architecture (x86_64, ppc64le, aarch64)
 - SAP HANA version (HANA 2.0 SPS 05, 06, 07, etc.)
 - Resource agent package and version (`sap-hana-ha` vs `resource-agents-sap-hana` vs `resource-agents-sap-hana-scaleout`)
