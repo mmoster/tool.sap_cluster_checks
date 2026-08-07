@@ -26,8 +26,11 @@ The following operating systems are **not supported**:
 ### Supported Cluster Stack
 
 - **Pacemaker/Corosync** with the `pcs` CLI (Red Hat)
+
+### Unsupported Cluster Stacks
+
+- **Pacemaker/Corosync** with `crmsh` (SUSE) — this tool requires the `pcs` CLI
 - Other cluster frameworks (Veritas, Windows Server Failover Clustering, etc.) are not applicable
-- **Note:** Pacemaker/Corosync with `crmsh` (SUSE) is **not supported** — this tool requires the `pcs` CLI
 
 ---
 
