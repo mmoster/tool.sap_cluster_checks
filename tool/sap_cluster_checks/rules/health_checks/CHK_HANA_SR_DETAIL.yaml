@@ -1,0 +1,97 @@
+# CHK_HANA_SR_DETAIL - SAP HANA System Replication details
+#
+# Shows replication mode, status, backlog, and operation mode
+# from HANA's own perspective (not just Pacemaker resource state).
+#
+# Sources:
+#   - SOSreport: sos_commands/saphana/{SID}_replicainfo (hdbcons replication info)
+#   - Live: "hdbnsutil -sr_state" or systemReplicationStatus.py as sidadm
+#
+check_id: CHK_HANA_SR_DETAIL
+version: "1.0"
+severity: WARNING
+optional: true
+description: SAP HANA System Replication details (mode, status, backlog)
+enabled: true
+
+source_definitions:
+  live_cmd: |
+    SID=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | cut -d/ -f4)
+    INST=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | sed 's/.*HDB//')
+    if [ -n "$SID" ] && [ -n "$INST" ]; then
+      SIDADM=$(echo "$SID" | tr '[:upper:]' '[:lower:]')adm
+      if id "$SIDADM" >/dev/null 2>&1; then
+        # Try systemReplicationStatus.py first (richer output)
+        SR_SCRIPT="/usr/sap/$SID/HDB$INST/exe/python_support/systemReplicationStatus.py"
+        if su - "$SIDADM" -c "test -f $SR_SCRIPT" 2>/dev/null; then
+          su - "$SIDADM" -c "python $SR_SCRIPT" 2>/dev/null
+        fi
+        # Always also run hdbnsutil for topology details
+        su - "$SIDADM" -c "hdbnsutil -sr_state" 2>/dev/null
+      else
+        echo "NOT_HANA_NODE"
+      fi
+    else
+      echo "NOT_HANA_NODE"
+    fi
+  sos_path: "sos_commands/saphana/*_replicainfo"
+
+parser:
+  type: regex
+  multiline: true
+  search_patterns:
+    # Replication mode: sync, syncmem, async
+    - name: replication_mode
+      regex: "ReplicationMode\\s+:\\s+(\\w+)"
+      group: 1
+    # Operation mode: logreplay, logreplay_readaccess, delta_datashipping
+    - name: operation_mode
+      regex: "OperationMode\\s+:\\s+(\\w+)"
+      group: 1
+    # Replication status: ReplicationStatus_Active, etc.
+    - name: replication_status
+      regex: "ReplicationStatus\\s+:\\s+(\\S+)"
+      group: 1
+    # Replay backlog in microseconds (0 = fully synced)
+    - name: replay_backlog_us
+      regex: "replayBacklog\\s+:\\s+(\\d+)\\s+microseconds"
+      group: 1
+    # Replay backlog size in bytes
+    - name: replay_backlog_bytes
+      regex: "replayBacklogSize\\s+:\\s+(\\d+)\\s+bytes"
+      group: 1
+    # SSL on replication connection
+    - name: ssl_active
+      regex: "SSLActive\\s+:\\s+(true|false)"
+      group: 1
+    # Full sync enabled
+    - name: full_sync
+      regex: "enable_full_sync\\s*=\\s*(true|false)"
+      group: 1
+    # Log shipping timeout
+    - name: logshipping_timeout
+      regex: "logshipping_timeout\\s*=\\s*(\\S+)"
+      group: 1
+    # Site role from hdbnsutil: "mode: primary" or "mode: syncmem"
+    - name: site_mode
+      regex: "mode:\\s+(primary|sync|syncmem|async|logreplay)"
+      group: 1
+    # Not a HANA node
+    - name: not_hana_node
+      regex: "(NOT_HANA_NODE)"
+      group: 1
+
+validation_logic:
+  scope: node
+  match_mode: any
+  expectations:
+    - key: replication_status
+      operator: in
+      value: ["ReplicationStatus_Active", "Active"]
+      message: "HANA System Replication is not active (status: check hdbnsutil -sr_state)"
+    - key: replication_mode
+      operator: info_if_exists
+      pass_message: "SR mode=${replication_mode}, op_mode=${operation_mode}, status=${replication_status}, backlog=${replay_backlog_bytes} bytes, SSL=${ssl_active}"
+    - key: not_hana_node
+      operator: info_if_exists
+      pass_message: "Not a HANA node"

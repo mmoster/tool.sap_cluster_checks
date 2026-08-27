@@ -1,0 +1,64 @@
+# CHK_HANA_VERSION - SAP HANA database version details
+#
+# Displays: full version, service pack level, branch, build date
+# Sources:
+#   - SOSreport: sos_commands/saphana/{SID}_version (from "HDB version")
+#   - Live: "HDB version" as sidadm
+#
+check_id: CHK_HANA_VERSION
+version: "1.0"
+severity: INFO
+optional: true
+description: SAP HANA database version details
+enabled: true
+
+source_definitions:
+  live_cmd: |
+    SID=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | cut -d/ -f4)
+    if [ -n "$SID" ]; then
+      SIDADM=$(echo "$SID" | tr '[:upper:]' '[:lower:]')adm
+      if id "$SIDADM" >/dev/null 2>&1; then
+        su - "$SIDADM" -c "HDB version" 2>/dev/null
+      else
+        echo "NOT_HANA_NODE"
+      fi
+    else
+      echo "NOT_HANA_NODE"
+    fi
+  sos_path: "sos_commands/saphana/*_version"
+
+parser:
+  type: regex
+  multiline: true
+  search_patterns:
+    # Full version: "2.00.089.03" from "2.00.089.03.1779443507"
+    - name: hana_version
+      regex: "version:\\s+(\\d+\\.\\d+\\.\\d+\\.\\d+)"
+      group: 1
+    # Branch reveals SP level: "fa/hana2sp08" -> sp08
+    - name: hana_branch
+      regex: "branch:\\s+(\\S+)"
+      group: 1
+    # SP number extracted from branch
+    - name: hana_sp
+      regex: "hana2sp(\\d+)"
+      group: 1
+    # Build date
+    - name: hana_compile_date
+      regex: "compile date:\\s+(\\d{4}-\\d{2}-\\d{2})"
+      group: 1
+    # Not a HANA node
+    - name: not_hana_node
+      regex: "(NOT_HANA_NODE)"
+      group: 1
+
+validation_logic:
+  scope: node
+  match_mode: any
+  expectations:
+    - key: hana_version
+      operator: info_if_exists
+      pass_message: "SAP HANA ${hana_version} (SPS${hana_sp}, branch ${hana_branch}, built ${hana_compile_date})"
+    - key: not_hana_node
+      operator: info_if_exists
+      pass_message: "Not a HANA node"

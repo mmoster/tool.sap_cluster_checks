@@ -1,0 +1,100 @@
+# CHK_HANA_LANDSCAPE - SAP HANA topology from database perspective
+#
+# Detects Scale-Up vs Scale-Out from HANA's internal landscape
+# configuration (landscapeHostConfiguration.py / sapcontrol).
+# This cross-validates the Pacemaker-level detection in CHK_CLUSTER_TYPE.
+#
+# Scale-Up: 1 host per site (single HANA instance)
+# Scale-Out: 2+ hosts per site (multiple HANA instances)
+#
+# Sources:
+#   - SOSreport: sos_commands/saphana/{SID}_{NR}_landscapeConfig
+#   - Live: landscapeHostConfiguration.py as sidadm
+#
+check_id: CHK_HANA_LANDSCAPE
+version: "1.0"
+severity: INFO
+optional: true
+description: SAP HANA landscape topology (Scale-Up vs Scale-Out)
+enabled: true
+
+source_definitions:
+  live_cmd: |
+    SID=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | cut -d/ -f4)
+    INST=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | sed 's/.*HDB//')
+    if [ -n "$SID" ] && [ -n "$INST" ]; then
+      SIDADM=$(echo "$SID" | tr '[:upper:]' '[:lower:]')adm
+      if id "$SIDADM" >/dev/null 2>&1; then
+        LANDSCAPE_SCRIPT="/usr/sap/$SID/HDB$INST/exe/python_support/landscapeHostConfiguration.py"
+        OUTPUT=$(su - "$SIDADM" -c "python $LANDSCAPE_SCRIPT" 2>/dev/null)
+        if [ -n "$OUTPUT" ]; then
+          echo "$OUTPUT"
+          # Count host entries (lines with | hostname | yes/no |)
+          HOST_COUNT=$(echo "$OUTPUT" | grep -cE '^\|\s+\S+\s+\|\s+(yes|no)\s+\|')
+          echo "HANA_HOST_COUNT=$HOST_COUNT"
+          if [ "$HOST_COUNT" -gt 1 ]; then
+            echo "HANA_TOPOLOGY=Scale-Out"
+          else
+            echo "HANA_TOPOLOGY=Scale-Up"
+          fi
+        fi
+        # Also get overall status
+        echo "$OUTPUT" | grep -i 'overall host status' || true
+      else
+        echo "NOT_HANA_NODE"
+      fi
+    else
+      echo "NOT_HANA_NODE"
+    fi
+  sos_path: "sos_commands/saphana/*_*_landscapeConfig"
+
+parser:
+  type: regex
+  multiline: true
+  search_patterns:
+    # First host entry - always present if HANA is installed
+    - name: landscape_host
+      regex: "^\\|\\s+(\\S+)\\s+\\|\\s+(yes|no)\\s+\\|\\s+(\\w+)\\s+\\|"
+      group: 1
+    # Host status (ok, error, etc.)
+    - name: host_status
+      regex: "^\\|\\s+\\S+\\s+\\|\\s+(?:yes|no)\\s+\\|\\s+(\\w+)\\s+\\|"
+      group: 1
+    # Second host entry = Scale-Out indicator
+    # Matches when there are 2+ host data rows in the landscape table
+    - name: second_host
+      regex: "^\\|\\s+\\S+\\s+\\|\\s+(?:yes|no)\\s+\\|[^\\n]+\\n\\|\\s+(\\S+)\\s+\\|\\s+(?:yes|no)\\s+\\|"
+      group: 1
+    # Overall host status line
+    - name: overall_status
+      regex: "overall host status:\\s+(\\w+)"
+      group: 1
+    # NameServer role (master = primary nameserver)
+    - name: nameserver_role
+      regex: "master\\s+\\d+\\s*\\|\\s*(master|slave)"
+      group: 0
+    # Live_cmd summary
+    - name: hana_host_count
+      regex: "HANA_HOST_COUNT=(\\d+)"
+      group: 1
+    - name: hana_topology
+      regex: "HANA_TOPOLOGY=(\\S+)"
+      group: 1
+    # Not a HANA node
+    - name: not_hana_node
+      regex: "(NOT_HANA_NODE)"
+      group: 1
+
+validation_logic:
+  scope: node
+  match_mode: any
+  expectations:
+    - key: hana_topology
+      operator: info_if_exists
+      pass_message: "HANA topology: ${hana_topology} (${hana_host_count} hosts, status: ${overall_status})"
+    - key: landscape_host
+      operator: info_if_exists
+      pass_message: "HANA host: ${landscape_host} (status: ${host_status}, overall: ${overall_status})"
+    - key: not_hana_node
+      operator: info_if_exists
+      pass_message: "Not a HANA node"

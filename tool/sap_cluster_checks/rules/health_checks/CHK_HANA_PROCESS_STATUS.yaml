@@ -1,0 +1,84 @@
+# CHK_HANA_PROCESS_STATUS - SAP HANA process health
+#
+# Checks per-process status from sapcontrol GetProcessList.
+# Each HANA process reports GREEN (ok), YELLOW (starting/stopping),
+# RED (failed), or GRAY (not running).
+#
+# Sources:
+#   - SOSreport: sos_commands/saphana/{SID}_{NR}_status
+#   - Live: "sapcontrol -nr <NR> -function GetProcessList" as sidadm
+#
+check_id: CHK_HANA_PROCESS_STATUS
+version: "1.0"
+severity: WARNING
+optional: true
+description: SAP HANA process health status
+enabled: true
+
+source_definitions:
+  live_cmd: |
+    SID=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | cut -d/ -f4)
+    INST=$(ls -d /usr/sap/*/HDB[0-9][0-9] 2>/dev/null | head -1 | sed 's/.*HDB//')
+    if [ -n "$SID" ] && [ -n "$INST" ]; then
+      SIDADM=$(echo "$SID" | tr '[:upper:]' '[:lower:]')adm
+      if id "$SIDADM" >/dev/null 2>&1; then
+        OUTPUT=$(su - "$SIDADM" -c "sapcontrol -nr $INST -function GetProcessList" 2>/dev/null)
+        echo "$OUTPUT"
+        # Emit summary for parser
+        TOTAL=$(echo "$OUTPUT" | grep -cE 'GREEN|YELLOW|RED|GRAY')
+        GREEN=$(echo "$OUTPUT" | grep -c 'GREEN')
+        echo "PROCESS_SUMMARY=${GREEN}/${TOTAL} processes GREEN"
+        if echo "$OUTPUT" | grep -qE ',\s*(YELLOW|RED|GRAY)\s*,'; then
+          PROBLEM=$(echo "$OUTPUT" | grep -E ',\s*(YELLOW|RED|GRAY)\s*,' | head -1 | sed 's/,\s*/|/g')
+          echo "PROCESS_PROBLEM=$PROBLEM"
+        fi
+      else
+        echo "NOT_HANA_NODE"
+      fi
+    else
+      echo "NOT_HANA_NODE"
+    fi
+  sos_path: "sos_commands/saphana/*_*_status"
+
+parser:
+  type: regex
+  multiline: true
+  search_patterns:
+    # sapcontrol returned OK
+    - name: getprocesslist
+      regex: "GetProcessList\\s+(OK|FAIL)"
+      group: 1
+    # Any process in non-healthy state (from raw CSV)
+    - name: process_problem
+      regex: "(hdb\\w+),\\s*[^,]+,\\s*(YELLOW|RED|GRAY)"
+      group: 0
+    # Confirm at least one healthy process exists
+    - name: process_green
+      regex: "(hdb\\w+),\\s*[^,]+,\\s*GREEN"
+      group: 0
+    # Summary from live_cmd
+    - name: process_summary
+      regex: "PROCESS_SUMMARY=(.*)"
+      group: 1
+    # Not a HANA node
+    - name: not_hana_node
+      regex: "(NOT_HANA_NODE)"
+      group: 1
+
+validation_logic:
+  scope: node
+  match_mode: any
+  expectations:
+    - key: process_problem
+      operator: not_exists
+      message: "HANA process not healthy - check sapcontrol GetProcessList"
+    - key: process_green
+      operator: exists
+      value: true
+      message: "No healthy HANA processes found"
+    - key: process_summary
+      operator: info_if_exists
+      pass_message: "${process_summary}"
+    - key: not_hana_node
+      operator: info_if_exists
+      pass_message: "Not a HANA node"
