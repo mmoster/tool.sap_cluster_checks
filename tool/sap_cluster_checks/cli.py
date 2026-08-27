@@ -907,6 +907,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             self._post_pacemaker_phase1(results)
         elif step_name == "sap" and phase == 1:
             self._post_sap_phase1(results, nodes)
+        elif step_name == "sap" and phase == 2:
+            self._post_sap_phase2(results)
 
     def _post_config_phase1(self, results: list):
         """After config phase 1: extract topology, apply retroactive filtering."""
@@ -1087,6 +1089,26 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         # Gather HANA database status and replication info
         if self._hana_installed:
             self._gather_hana_db_status(install_results, self._hana_nodes)
+
+    def _post_sap_phase2(self, results: list):
+        """After SAP phase 2: extract HANA version from CHK_HANA_VERSION results."""
+        if not self._hana_db_status:
+            return
+
+        for r in results:
+            if r.check_id == "CHK_HANA_VERSION" and r.status == CheckStatus.PASSED and r.details:
+                parsed = r.details.get("parsed", {})
+                version = parsed.get("hana_version")
+                if version:
+                    sp = parsed.get("hana_sp", "")
+                    self._hana_db_status["hana_version"] = version
+                    if sp:
+                        self._hana_db_status["hana_sp"] = sp
+                    version_display = version
+                    if sp:
+                        version_display += f" (SPS{sp})"
+                    print(f"  [INFO] HANA version: {version_display}")
+                    break
 
     def _extract_hana_resource_state(self, results: list) -> str:
         """Extract HANA resource state from CHK_RESOURCE_STATUS results.

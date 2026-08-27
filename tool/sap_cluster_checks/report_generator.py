@@ -997,6 +997,13 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
         # Build status info table
         db_status_info = {}
+        hana_version = hana_db_status.get("hana_version")
+        if hana_version:
+            hana_sp = hana_db_status.get("hana_sp", "")
+            version_display = hana_version
+            if hana_sp:
+                version_display += f" (SPS{hana_sp})"
+            db_status_info["HANA Version"] = version_display
         if db_running:
             db_status_info["Database Running"] = f"Yes ({', '.join(running_nodes)})"
         else:
