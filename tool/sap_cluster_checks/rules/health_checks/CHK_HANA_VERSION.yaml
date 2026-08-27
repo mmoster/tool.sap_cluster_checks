@@ -5,6 +5,11 @@
 #   - SOSreport: sos_commands/saphana/{SID}_version (from "HDB version")
 #   - Live: "HDB version" as sidadm
 #
+# Prerequisite (sosreport): requires the 'saphana' sos plugin.
+# The plugin runs automatically when HANA is installed on the node.
+# If sos_commands/saphana/ is missing, this check is silently skipped.
+# To include it explicitly: sos report -o saphana
+#
 check_id: CHK_HANA_VERSION
 version: "1.0"
 severity: INFO
