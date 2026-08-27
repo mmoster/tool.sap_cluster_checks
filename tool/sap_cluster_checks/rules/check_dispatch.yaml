@@ -75,6 +75,10 @@ steps:
         parallel: true
         gate: hana_installed
         checks:
+          - check_id: CHK_HANA_VERSION
+          - check_id: CHK_HANA_PROCESS_STATUS
+          - check_id: CHK_HANA_SR_DETAIL
+          - check_id: CHK_HANA_LANDSCAPE
           - check_id: CHK_HANA_SR_STATUS
             gate: hana_resource_running
           - check_id: CHK_REPLICATION_MODE
