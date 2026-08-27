@@ -161,6 +161,51 @@ class TestNoHanaResources:
         assert "no SAP HANA resources" in result.message
 
 
+class TestCustomResourceNames:
+    """Resource detection should work with custom names (detected by agent type)."""
+
+    def test_custom_named_controller_detected(self):
+        """rsc_SAPHanaCon_RH1_HDB02 detected via type string SAPHanaController."""
+        result = _detect(_parsed(
+            saphana_controller="SAPHanaController):  Promoted",  # type-based match
+        ))
+        assert result.details["cluster_type"] == "Scale-Up"
+        assert result.details["has_saphana_controller"] is True
+
+    def test_custom_named_topology_detected(self):
+        """rsc_SAPHanaTop_RH1_HDB02 detected via type string SAPHanaTopology."""
+        result = _detect(_parsed(
+            saphana_controller=None,
+            saphana_topology="SAPHanaTopology):  Started",  # type-based match
+            clone_max="2",
+        ))
+        assert result.details["cluster_type"] == "Scale-Up"
+        assert result.details["has_saphana_controller"] is False
+
+    def test_custom_named_both_resources_detected(self):
+        """Custom names with both Controller and Topology → valid Scale-Up."""
+        result = _detect(_parsed(
+            saphana_controller="SAPHanaController",  # any truthy string works
+            saphana_topology="SAPHanaTopology",
+            clone_max="2",
+        ))
+        assert result.details["cluster_type"] == "Scale-Up"
+        assert result.details["has_saphana_controller"] is True
+
+    def test_custom_named_scale_out(self):
+        """Custom-named resources in Scale-Out configuration."""
+        result = _detect(_parsed(
+            node_count="5",
+            saphana_controller="SAPHanaController",
+            saphana_topology="SAPHanaTopology",
+            clone_max="4",
+            majority_maker="has_constraint",
+            majority_maker_node="mmnode",
+        ))
+        assert result.details["cluster_type"] == "Scale-Out"
+        assert result.details["has_majority_maker"] is True
+
+
 class TestEdgeCases:
     def test_invalid_node_count(self):
         result = _detect(_parsed(node_count="abc"))

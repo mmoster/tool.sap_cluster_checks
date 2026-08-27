@@ -1,6 +1,6 @@
 # CHK_CLUSTER_TYPE - Detect SAP HANA HA configuration type
 check_id: CHK_CLUSTER_TYPE
-version: "2.1"
+version: "2.2"
 severity: INFO
 description: Detect SAP HANA HA cluster configuration (Scale-Up vs Scale-Out)
 enabled: true
@@ -16,15 +16,21 @@ source_definitions:
   live_cmd: |
     echo "=== NODES ===" && crm_node -l 2>/dev/null | wc -l && crm_node -l 2>/dev/null;
     echo "=== HANA_RESOURCES ===" && pcs resource show 2>/dev/null | grep -E 'SAPHana|SAPHanaController|SAPHanaTopology' || crm_mon -1 2>/dev/null | grep -E 'SAPHana|SAPHanaController' || cat /var/lib/pacemaker/cib/cib.xml 2>/dev/null | grep -oE 'SAPHana[^"]*' | head -1;
-    echo "=== CLONE_MAX ===" && (pcs resource config 2>/dev/null | grep -A10 'SAPHanaController\|SAPHana_' | grep -E 'clone-max' | head -1 || cat /var/lib/pacemaker/cib/cib.xml 2>/dev/null | grep -oE 'clone-max.*value="[0-9]+"' | grep -oE '[0-9]+' | head -1 | sed 's/^/clone-max=/') || echo "clone-max=2";
+    echo "=== CLONE_MAX ===" && (pcs resource config 2>/dev/null | grep -B10 -A10 'SAPHanaController\|type=SAPHana[^A-Za-z]\|SAPHana_' | grep -E 'clone-max' | head -1 || cat /var/lib/pacemaker/cib/cib.xml 2>/dev/null | grep -oE 'clone-max.*value="[0-9]+"' | grep -oE '[0-9]+' | head -1 | sed 's/^/clone-max=/') || echo "clone-max=2";
     echo "=== MAJORITY_MAKER ===";
     # Detect majority maker by: 1) name pattern, 2) location constraints excluding BOTH SAPHanaTopology AND SAPHanaController
     # A node is a majority maker ONLY if BOTH resources are excluded from it (not just app servers)
     MM_BY_NAME=$(crm_node -l 2>/dev/null | grep -iE 'majority|mm-' | awk '{print $2}');
+    # Find clone resource names by agent type (handles custom resource naming)
+    CONTROLLER_CLONE=$(pcs resource config 2>/dev/null | grep -B5 'type=SAPHanaController' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
+    TOPOLOGY_CLONE=$(pcs resource config 2>/dev/null | grep -B5 'type=SAPHanaTopology' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
     # Use 'pcs constraint location config' (pcs 0.12+) or 'pcs constraint location show' (older)
     MM_CONSTRAINT_OUTPUT=$(pcs constraint location config 2>/dev/null || pcs constraint location show 2>/dev/null);
-    MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "SAPHanaController.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
-    MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "SAPHanaTopology.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+    # Search constraints by clone name (found dynamically above) or by type name (backward compat)
+    CONTROLLER_PAT="${CONTROLLER_CLONE:-SAPHanaController}";
+    TOPOLOGY_PAT="${TOPOLOGY_CLONE:-SAPHanaTopology}";
+    MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$CONTROLLER_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+    MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$TOPOLOGY_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
     MM_BY_CONSTRAINT="";
     for node in $MM_CONTROLLER; do
       if echo "$MM_TOPOLOGY" | grep -qx "$node"; then
@@ -89,16 +95,20 @@ source_definitions:
     echo "=== HANA_RESOURCES ===";
     pcs -f {file} resource status 2>/dev/null | grep -E 'SAPHana|SAPHanaController|SAPHanaTopology' || pcs -f {file} resource show 2>/dev/null | grep -E 'SAPHana|SAPHanaController|SAPHanaTopology';
     echo "=== CLONE_MAX ===";
-    pcs -f {file} resource config 2>/dev/null | grep -A10 'SAPHanaController\|SAPHana_' | grep -E 'clone-max' | head -1 || echo "clone-max=2";
+    pcs -f {file} resource config 2>/dev/null | grep -B10 -A10 'SAPHanaController\|type=SAPHana[^A-Za-z]\|SAPHana_' | grep -E 'clone-max' | head -1 || echo "clone-max=2";
     echo "=== MAJORITY_MAKER ===";
     # Detect majority maker by location constraints excluding SAPHanaTopology AND SAPHanaController
     # A node is a majority maker ONLY if BOTH resources are excluded from it
+    # Find clone resource names by agent type (handles custom resource naming)
+    CONTROLLER_CLONE=$(pcs -f {file} resource config 2>/dev/null | grep -B5 'type=SAPHanaController' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
+    TOPOLOGY_CLONE=$(pcs -f {file} resource config 2>/dev/null | grep -B5 'type=SAPHanaTopology' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
     # Use 'pcs constraint location config' (pcs 0.12+) or 'pcs constraint location show' (older)
     MM_CONSTRAINT_OUTPUT=$(pcs -f {file} constraint location config 2>/dev/null || pcs -f {file} constraint location show 2>/dev/null);
-    # Find nodes where SAPHanaController is excluded
-    MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "SAPHanaController.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
-    # Find nodes where SAPHanaTopology is excluded
-    MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "SAPHanaTopology.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+    # Search constraints by clone name (found dynamically above) or by type name (backward compat)
+    CONTROLLER_PAT="${CONTROLLER_CLONE:-SAPHanaController}";
+    TOPOLOGY_PAT="${TOPOLOGY_CLONE:-SAPHanaTopology}";
+    MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$CONTROLLER_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+    MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$TOPOLOGY_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
     # Majority maker = node that appears in BOTH lists (has constraints for both resources)
     MM="";
     for node in $MM_CONTROLLER; do
@@ -121,14 +131,18 @@ parser:
       regex: "\\d+\\s+(\\S+)\\s+(member|lost)"
       group: 0
     - name: saphana_resource
-      regex: "(SAPHana_\\S+)"
-      group: 1
+      # Match legacy SAPHana agent by type (ocf:...:SAPHana) or name (SAPHana_*)
+      # Must NOT match SAPHanaController/SAPHanaTopology/SAPHanaFilesystem
+      regex: "(SAPHana[_):\\s][^A-Za-z])"
+      group: 0
     - name: saphana_controller
-      regex: "(SAPHanaController_\\S+)"
-      group: 1
+      # Match SAPHanaController by agent type or resource name
+      regex: "(SAPHanaController)"
+      group: 0
     - name: saphana_topology
-      regex: "(SAPHanaTopology\\S*)"
-      group: 1
+      # Match SAPHanaTopology by agent type or resource name
+      regex: "(SAPHanaTopology)"
+      group: 0
     - name: clone_max
       regex: "clone-max[=:\"].*?(\\d+)"
       group: 1
