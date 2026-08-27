@@ -1110,9 +1110,10 @@ class RulesEngine:
         )
 
         messages = [format_finding_message(f) for f in findings if f.severity != "INFO"]
-        summary = "; ".join(messages[:3])
-        if len(messages) > 3:
-            summary += f" (+{len(messages) - 3} more)"
+        summary = "\n           ".join(messages)
+        if len(messages) > 5:
+            summary = "\n           ".join(messages[:5])
+            summary += f"\n           (+{len(messages) - 5} more)"
 
         return CheckResult(
             check_id=rule.check_id,

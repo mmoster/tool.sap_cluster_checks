@@ -170,6 +170,10 @@ class HadrValidator:
     ) -> List[Finding]:
         findings: List[Finding] = []
 
+        # Build case-insensitive lookup for trace settings
+        # HANA global.ini keys are case-insensitive, e.g. ha_dr_HanaSR == ha_dr_hanasr
+        trace_lower = {k.lower(): v for k, v in actual.trace_settings.items()}
+
         for key, expected_val in expected.trace.entries.items():
             # Skip ChkSrv trace if ChkSrv hook is optional and not configured
             chksrv_hook = next((h for h in expected.hooks if h.is_optional), None)
@@ -181,7 +185,7 @@ class HadrValidator:
                 if _sec is None:
                     continue
 
-            actual_val = actual.trace_settings.get(key)
+            actual_val = trace_lower.get(key.lower())
             if actual_val is None:
                 desc, cmd = generate_fix_for_missing_trace(key, expected_val, actual.sid)
                 findings.append(

@@ -88,7 +88,7 @@ def _extract_trace(ini_sections: Dict[str, Dict[str, str]]) -> Dict[str, str]:
     for name, entries in ini_sections.items():
         if name.lower() == "trace":
             for key, val in entries.items():
-                if key.startswith("ha_dr_"):
+                if key.lower().startswith("ha_dr_"):
                     trace_section[key] = val
     return trace_section
 

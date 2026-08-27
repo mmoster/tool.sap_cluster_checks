@@ -274,6 +274,101 @@ class TestCaseInsensitiveSections:
         )
 
 
+class TestCaseInsensitiveTrace:
+    """Trace keys in global.ini are case-insensitive for HANA."""
+
+    def test_mixed_case_trace_keys_no_warning(self):
+        """ha_dr_HanaSR and ha_dr_ChkSrv should match ha_dr_hanasr/ha_dr_chksrv."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_hanasr]\n"
+                "provider = HanaSR\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "\n"
+                "[ha_dr_provider_chksrv]\n"
+                "provider = ChkSrv\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 2\n"
+                "action_on_lost = stop\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_HanaSR = info\n"
+                "ha_dr_ChkSrv = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_angi.txt').read_text(),
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        trace_findings = [f for f in findings if f.category == 'trace']
+        assert len(trace_findings) == 0, (
+            f"Expected no trace findings but got: "
+            f"{[f.what_is_wrong for f in trace_findings]}"
+        )
+
+    def test_uppercase_trace_keys_no_warning(self):
+        """All-uppercase trace keys should also match."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_hanasr]\n"
+                "provider = HanaSR\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "\n"
+                "[trace]\n"
+                "HA_DR_HANASR = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_angi.txt').read_text(),
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        trace_findings = [f for f in findings if f.category == 'trace']
+        # ha_dr_hanasr should be found (case-insensitive), ha_dr_chksrv is
+        # optional (ChkSrv hook not configured) so no trace warning expected
+        hanasr_trace = [f for f in trace_findings
+                        if 'hanasr' in f.what_is_wrong.lower()]
+        assert len(hanasr_trace) == 0
+
+
+class TestSudoersSapHaRole:
+    """Sudoers entries in the format produced by the SAP HA Ansible role."""
+
+    def test_per_command_nopasswd_format(self):
+        """SAP HA role style: (ALL) NOPASSWD: /usr/sbin/crm_attribute -n hana_..."""
+        sudoers = (
+            "Defaults!/usr/sbin/crm_attribute -n hana_s4d_site_srHook_DC1 "
+            "-v SOK -t crm_config -s SAPHanaSR !requiretty\n"
+            "s4dadm ALL=(ALL) NOPASSWD: /usr/sbin/crm_attribute -n hana_s4d_site_srHook_DC1 "
+            "-v SOK -t crm_config -s SAPHanaSR, "
+            "/usr/sbin/crm_attribute -n hana_s4d_site_srHook_DC1 "
+            "-v SFAIL -t crm_config -s SAPHanaSR\n"
+        )
+        global_ini = (FIXTURES / 'global_ini_angi_ok.txt').read_text()
+        raw = _build_raw(
+            global_ini=global_ini,
+            sudoers=sudoers,
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        sudoers_findings = [f for f in findings if f.category == 'sudoers']
+        # crm_attribute should NOT be flagged as missing
+        crm_findings = [f for f in sudoers_findings
+                        if 'crm_attribute' in f.what_is_wrong]
+        assert len(crm_findings) == 0, (
+            f"Expected no crm_attribute findings but got: "
+            f"{[f.what_is_wrong for f in crm_findings]}"
+        )
+
+
 class TestFindingSuggestions:
     """Verify all findings have non-empty fix descriptions and commands."""
 
