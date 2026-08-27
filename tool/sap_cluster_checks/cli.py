@@ -46,6 +46,7 @@ from .lib.install_guide import InstallGuideMixin
 from .lib.hana_status import HanaStatusMixin
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
+DEFAULT_OUTPUT_DIR = Path.cwd() / "check_results"
 
 
 class Spinner:
@@ -152,7 +153,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         generate_pdf: bool = False,
         verbose_pdf: bool = False,
     ):
-        self.config_dir = Path(config_dir) if config_dir else SCRIPT_DIR
+        self.config_dir = Path(config_dir) if config_dir else DEFAULT_OUTPUT_DIR
+        self.config_dir.mkdir(parents=True, exist_ok=True)
         self.sosreport_dir = sosreport_dir
         self.hosts_file = hosts_file
         self.workers = workers
@@ -2058,7 +2060,7 @@ Examples:
     parser.add_argument(
         "--cluster", "-C", help="Use saved cluster by name (from previous discovery)"
     )
-    parser.add_argument("--config-dir", "-c", help="Directory to store configuration (default: ./)")
+    parser.add_argument("--config-dir", "-c", help="Directory to store configuration and reports (default: ./check_results)")
 
     # Actions
     parser.add_argument(
@@ -2355,14 +2357,14 @@ Examples:
 
     # Handle guide action
     if args.guide:
-        _cfg_dir = Path(args.config_dir) if args.config_dir else SCRIPT_DIR
+        _cfg_dir = Path(args.config_dir) if args.config_dir else DEFAULT_OUTPUT_DIR
         print_guide(_rhel_major_from_config(_cfg_dir))
         sys.exit(0)
 
     # Handle install guide shortcut (-i / --install)
     if args.install:
         # Try to use dynamic guide if we have access config
-        config_dir = Path(args.config_dir) if args.config_dir else SCRIPT_DIR
+        config_dir = Path(args.config_dir) if args.config_dir else DEFAULT_OUTPUT_DIR
         config_path = config_dir / AccessDiscovery.CONFIG_FILE
         if config_path.exists():
             try:
@@ -2384,7 +2386,7 @@ Examples:
     if args.suggest:
         step = args.suggest
         skip_steps = args.suggest_skip or []
-        config_dir = Path(args.config_dir) if args.config_dir else SCRIPT_DIR
+        config_dir = Path(args.config_dir) if args.config_dir else DEFAULT_OUTPUT_DIR
 
         if step == "auto":
             # Read last run status to find first failing step
@@ -2476,7 +2478,8 @@ Examples:
         sys.exit(0)
 
     # Determine config directory
-    config_dir = Path(args.config_dir) if args.config_dir else SCRIPT_DIR
+    config_dir = Path(args.config_dir) if args.config_dir else DEFAULT_OUTPUT_DIR
+    config_dir.mkdir(parents=True, exist_ok=True)
     config_path = config_dir / AccessDiscovery.CONFIG_FILE
 
     # Handle export-ansible action (before interactive mode)

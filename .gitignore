@@ -24,13 +24,7 @@ env/
 *~
 
 # Generated reports and runtime files
-health_check_report_*.yaml
-health_check_report_*.pdf
-[0-9]*_*.yaml
-[0-9]*_*.pdf
-test_report.pdf
-cluster_access_config.yaml
-last_run_status.yaml
+check_results/
 
 # SOSreport data (fetched/extracted for analysis)
 sosreports/
