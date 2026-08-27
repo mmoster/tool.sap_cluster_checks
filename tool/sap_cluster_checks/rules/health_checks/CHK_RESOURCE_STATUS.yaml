@@ -12,7 +12,7 @@
 # intentionally stopped during maintenance.
 #
 check_id: CHK_RESOURCE_STATUS
-version: "2.0"
+version: "2.1"
 severity: CRITICAL
 description: Verify SAP HANA cluster resources are running
 enabled: true
@@ -54,7 +54,9 @@ parser:
   multiline: true
   search_patterns:
     - name: sap_hana_resource
-      regex: "(SAPHana|rsc_SAPHana|SAPHanaTopology)"
+      # Match any HANA resource agent type (SAPHana, SAPHanaController, SAPHanaTopology)
+      # These type strings appear in pcs/crm_mon output regardless of resource naming
+      regex: "(SAPHana)"
       group: 0
     - name: resource_stopped
       regex: "(Stopped|FAILED|stopped)"

@@ -1,6 +1,6 @@
 # CHK_CLONE_CONFIG - Validate clone resource configuration
 check_id: CHK_CLONE_CONFIG
-version: "1.1"
+version: "1.2"
 severity: CRITICAL
 description: Validate SAPHana clone/promotable resource configuration
 enabled: true
@@ -17,44 +17,49 @@ source_definitions:
   #   This enables parsing cib.xml with: pcs -f cib.xml resource config
   live_cmd: |
     echo "=== HANA_NODES ===" && \
-    pcs resource config 2>/dev/null | grep -A20 'SAPHanaController.*clone' | grep -E 'clone-max|clone-node-max|interleave|promotable' | head -5 && \
+    pcs resource config 2>/dev/null | grep -B5 -A20 'SAPHanaController' | grep -E 'clone-max|clone-node-max|interleave|promotable' | head -5 && \
     echo "=== TOPOLOGY ===" && \
-    pcs resource config 2>/dev/null | grep -A10 'SAPHanaTopology.*clone' | grep -E 'clone-max|clone-node-max|interleave' | head -4 && \
+    pcs resource config 2>/dev/null | grep -B5 -A10 'SAPHanaTopology' | grep -E 'clone-max|clone-node-max|interleave' | head -4 && \
     echo "=== NODE_COUNT ===" && \
     pcs status nodes 2>/dev/null | grep -c 'Online:' || echo "0"
-  sos_path: "sos_commands/pacemaker/pcs_config"
-  # Fallback: run pcs -f cib.xml locally when pcs_config shows error (cluster stopped)
-  sos_cmd: "pcs -f {file} resource config 2>/dev/null"
+  # Structured sos_cmd produces the same sectioned output as live_cmd
+  # so parser patterns work consistently for both live and sosreport analysis
+  sos_cmd: |
+    echo "=== HANA_NODES ===" && \
+    pcs -f {file} resource config 2>/dev/null | grep -B5 -A20 'SAPHanaController' | grep -E 'clone-max|clone-node-max|interleave|promotable' | head -5 && \
+    echo "=== TOPOLOGY ===" && \
+    pcs -f {file} resource config 2>/dev/null | grep -B5 -A10 'SAPHanaTopology' | grep -E 'clone-max|clone-node-max|interleave' | head -4
   sos_cmd_file: "sos_commands/pacemaker/crm_report/*/cib.xml"
 
 parser:
   type: regex
   multiline: true
   search_patterns:
-    # For pcs_config output: clone-max=4
-    # For cib.xml: name="clone-max" value="4"
+    # Both live_cmd and sos_cmd produce sectioned output with === markers
+    # Controller values are in HANA_NODES section, Topology in TOPOLOGY section
     - name: controller_clone_max
-      regex: "SAPHanaController[\\s\\S]*?clone-max[=\"]+(\\d+)"
+      regex: "=== HANA_NODES ===[\\s\\S]*?clone-max[=\"]+(\\d+)"
       group: 1
     - name: controller_clone_node_max
-      regex: "SAPHanaController[\\s\\S]*?clone-node-max[=\"]+(\\d+)"
+      regex: "=== HANA_NODES ===[\\s\\S]*?clone-node-max[=\"]+(\\d+)"
       group: 1
     - name: controller_interleave
-      regex: "SAPHanaController[\\s\\S]*?interleave[=\"]+(true|false)"
+      regex: "=== HANA_NODES ===[\\s\\S]*?interleave[=\"]+(true|false)"
       group: 1
     - name: controller_promotable
-      regex: "SAPHanaController[\\s\\S]*?promotable[=\"]+(true|false)"
+      regex: "=== HANA_NODES ===[\\s\\S]*?promotable[=\"]+(true|false)"
       group: 1
     - name: topology_clone_max
-      regex: "SAPHanaTopology[\\s\\S]*?clone-max[=\"]+(\\d+)"
+      regex: "=== TOPOLOGY ===[\\s\\S]*?clone-max[=\"]+(\\d+)"
       group: 1
     - name: topology_clone_node_max
-      regex: "SAPHanaTopology[\\s\\S]*?clone-node-max[=\"]+(\\d+)"
+      regex: "=== TOPOLOGY ===[\\s\\S]*?clone-node-max[=\"]+(\\d+)"
       group: 1
     - name: topology_interleave
-      regex: "SAPHanaTopology[\\s\\S]*?interleave[=\"]+(true|false)"
+      regex: "=== TOPOLOGY ===[\\s\\S]*?interleave[=\"]+(true|false)"
       group: 1
     - name: saphana_resource
+      # Match SAPHanaController or SAPHanaTopology by agent type or name
       regex: "(SAPHanaController|SAPHanaTopology)"
       group: 0
 
