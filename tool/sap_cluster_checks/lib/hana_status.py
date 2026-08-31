@@ -53,14 +53,7 @@ class HanaStatusMixin:
             if node_sidadm:
                 sidadm = node_sidadm  # Keep last valid sidadm for offline queries
 
-            # Determine running state:
-            # - live_cmd sets hana_running=yes/no explicitly
-            # - SOSreport: infer from hana_process/hdb_process matches in ps output
-            hana_running = parsed.get("hana_running")
-            if hana_running is None and (parsed.get("hana_process") or parsed.get("hdb_process")):
-                hana_running = "yes"
-
-            if hana_running == "yes" and node_sidadm:
+            if parsed.get("hana_running") == "yes" and node_sidadm:
                 hana_running_nodes.append(
                     {
                         "node": result.node,

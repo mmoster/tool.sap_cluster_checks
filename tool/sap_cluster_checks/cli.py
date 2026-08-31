@@ -1022,6 +1022,13 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             else:
                 nodes_without_hana.append(r.node)
 
+            # SOSreport: infer hana_running from detected HANA processes
+            # (live_cmd sets HANA_RUNNING explicitly, but SOSreport data doesn't)
+            if parsed.get("hana_running") is None and r.details:
+                if parsed.get("hana_process") or parsed.get("hdb_process"):
+                    parsed["hana_running"] = "yes"
+                    r.details["parsed"] = parsed
+
         self._debug_print(
             f"HANA install check (raw): nodes_with={nodes_with_hana}, nodes_without={nodes_without_hana}"
         )
@@ -1091,7 +1098,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             self._gather_hana_db_status(install_results, self._hana_nodes)
 
     def _post_sap_phase2(self, results: list):
-        """After SAP phase 2: extract HANA version from CHK_HANA_VERSION results."""
+        """After SAP phase 2: extract HANA version, warn about missing saphana data."""
         if not self._hana_db_status:
             return
 
@@ -1109,6 +1116,30 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                         version_display += f" (SPS{sp})"
                     print(f"  [INFO] HANA version: {version_display}")
                     break
+
+        # Warn about nodes missing saphana sos plugin data
+        hana_info_checks = {
+            "CHK_HANA_VERSION", "CHK_HANA_PROCESS_STATUS",
+            "CHK_HANA_SR_DETAIL", "CHK_HANA_LANDSCAPE",
+        }
+        nodes_missing = set()
+        nodes_ok = set()
+        for r in results:
+            if r.check_id in hana_info_checks and r.node:
+                if r.status == CheckStatus.ERROR:
+                    nodes_missing.add(r.node)
+                elif r.status == CheckStatus.PASSED:
+                    nodes_ok.add(r.node)
+        # Only warn for HANA nodes that failed all info checks (not just one)
+        nodes_missing -= nodes_ok
+        if nodes_missing:
+            print(
+                f"  [WARN] SAP HANA sos plugin data (sos_commands/saphana/) missing on: "
+                f"{', '.join(sorted(nodes_missing))}"
+            )
+            print(
+                "         To include it: sos report -o saphana"
+            )
 
     def _extract_hana_resource_state(self, results: list) -> str:
         """Extract HANA resource state from CHK_RESOURCE_STATUS results.
