@@ -23,7 +23,8 @@ env/
 *.swo
 *~
 
-# Generated reports and runtime files
+# Generated results (reports, configs, access state)
+results/
 reports/
 check_results/
 

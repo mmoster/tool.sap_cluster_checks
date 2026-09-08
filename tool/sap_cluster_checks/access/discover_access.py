@@ -629,8 +629,8 @@ def main():
     parser.add_argument(
         "--config-dir",
         "-c",
-        default="reports",
-        help="Directory to store configuration (default: ./reports)",
+        default="results",
+        help="Directory to store configuration (default: ./results)",
     )
     parser.add_argument("--hosts-file", "-H", help="File containing list of hosts (one per line)")
     parser.add_argument(

@@ -46,7 +46,7 @@ from .lib.install_guide import InstallGuideMixin
 from .lib.hana_status import HanaStatusMixin
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-DEFAULT_OUTPUT_DIR = Path.cwd() / "reports"
+DEFAULT_OUTPUT_DIR = Path.cwd() / "results"
 
 
 class Spinner:
@@ -2115,7 +2115,7 @@ Examples:
     parser.add_argument(
         "--cluster", "-C", help="Use saved cluster by name (from previous discovery)"
     )
-    parser.add_argument("--config-dir", "-c", help="Directory to store configuration and reports (default: ./reports)")
+    parser.add_argument("--config-dir", "-c", help="Directory to store configuration and reports (default: ./results)")
 
     # Actions
     parser.add_argument(

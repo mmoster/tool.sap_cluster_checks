@@ -8,7 +8,7 @@
 - Rules engine: `tool/sap_cluster_checks/rules/engine.py`
 
 ## Output files
-- Default output directory: `./reports/` (gitignored)
+- Default output directory: `./results/` (gitignored) — contains reports, configs, and access state
 - Report YAMLs and PDFs always have timestamps in filenames
 - State files (`cluster_access_config.yaml`, `last_run_status.yaml`) need stable names — the tool reads them back on subsequent runs
 - Config reference files (`{cluster}_config.yaml`) are write-only snapshots and include timestamps
