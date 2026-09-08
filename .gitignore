@@ -24,6 +24,7 @@ env/
 *~
 
 # Generated reports and runtime files
+reports/
 check_results/
 
 # SOSreport data (fetched/extracted for analysis)

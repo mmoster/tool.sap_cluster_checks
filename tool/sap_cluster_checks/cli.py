@@ -46,7 +46,7 @@ from .lib.install_guide import InstallGuideMixin
 from .lib.hana_status import HanaStatusMixin
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-DEFAULT_OUTPUT_DIR = Path.cwd() / "check_results"
+DEFAULT_OUTPUT_DIR = Path.cwd() / "reports"
 
 
 class Spinner:
@@ -249,7 +249,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                     if extractor:
                         extracted = extractor.get_config()
                         # Write config YAML for reference
-                        config_yaml = self.config_dir / f"{cluster_name or 'cluster'}_config.yaml"
+                        config_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        config_yaml = self.config_dir / f"{config_ts}_{cluster_name or 'cluster'}_config.yaml"
                         try:
                             extractor.write_yaml(str(config_yaml))
                             self._debug_print(f"Config written to: {config_yaml}")
@@ -288,7 +289,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
                     if extractor:
                         extracted = extractor.get_config()
-                        config_yaml = self.config_dir / f"{cluster_name or 'cluster'}_config.yaml"
+                        config_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        config_yaml = self.config_dir / f"{config_ts}_{cluster_name or 'cluster'}_config.yaml"
                         try:
                             extractor.write_yaml(str(config_yaml))
                             self._debug_print(f"Config written to: {config_yaml}")
@@ -2113,7 +2115,7 @@ Examples:
     parser.add_argument(
         "--cluster", "-C", help="Use saved cluster by name (from previous discovery)"
     )
-    parser.add_argument("--config-dir", "-c", help="Directory to store configuration and reports (default: ./check_results)")
+    parser.add_argument("--config-dir", "-c", help="Directory to store configuration and reports (default: ./reports)")
 
     # Actions
     parser.add_argument(
