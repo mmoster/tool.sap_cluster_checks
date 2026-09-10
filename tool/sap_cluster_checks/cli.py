@@ -2404,7 +2404,7 @@ Examples:
             )
             if downloaded:
                 # Set sosreport_dir to where we downloaded them
-                args.sosreport_dir = output_dir or str(Path.cwd() / "sosreports")
+                args.sosreport_dir = output_dir or str(Path.cwd() / "results" / "sosreports")
             else:
                 print("  No SOSreports were collected.")
                 sys.exit(1)

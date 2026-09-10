@@ -395,7 +395,7 @@ def run_usage_scan(base_dir: str = None, seed_hosts: list = None):
         options.append(("c", "Continue with existing configuration"))
 
     if n_compressed > 0:
-        options.append(("e", f"Extract {n_compressed} compressed sosreport(s) and analyze"))
+        options.append(("e", f"Extract {n_compressed} compressed sosreports and analyze"))
 
     if n_extracted > 0 or n_compressed > 0:
         sos_dir = (
@@ -495,7 +495,7 @@ def run_usage_scan(base_dir: str = None, seed_hosts: list = None):
         extracted = extract_sosreports_parallel(resources["sosreports_compressed"])
         if extracted:
             sos_dir = os.path.dirname(extracted[0])
-            print(f"\n  Extracted {len(extracted)} sosreport(s).")
+            print(f"\n  Extracted {len(extracted)} sosreports.")
             print("  Run health check with:")
             print(f"    ./sap_cluster_checks.py -s {sos_dir}")
             return {"action": "sosreport", "sosreport_dir": sos_dir}

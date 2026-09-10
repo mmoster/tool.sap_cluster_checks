@@ -795,7 +795,7 @@ def create_and_fetch_sosreports(
     if output_dir:
         sos_dir = Path(output_dir)
     else:
-        sos_dir = Path.cwd() / "sosreports"
+        sos_dir = Path.cwd() / "results" / "sosreports"
 
     sos_dir.mkdir(parents=True, exist_ok=True)
 
@@ -863,7 +863,7 @@ def create_and_fetch_sosreports(
     print()
     print(f"{'=' * 63}")
     if downloaded_files:
-        print(f" Downloaded {len(downloaded_files)} SOSreport(s) to: {sos_dir}")
+        print(f" Downloaded {len(downloaded_files)} sosreports to: {sos_dir}")
         print()
         print(" To analyze with health check:")
         print(f"   ./sap_cluster_checks.py -s {sos_dir}")
@@ -1132,7 +1132,7 @@ def fetch_sosreports(  # pylint: disable=unknown-option-value,too-many-positiona
 
     print()
     if downloaded_files:
-        print(f"Downloaded {len(downloaded_files)} sosreport(s) to: {sos_dir}")
+        print(f"Downloaded {len(downloaded_files)} sosreports to: {sos_dir}")
         print("\nTo analyze with health check:")
         print(f"  ./sap_cluster_checks.py -s {sos_dir}")
     else:

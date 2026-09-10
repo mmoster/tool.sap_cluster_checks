@@ -179,7 +179,7 @@ class AccessDiscovery(SOSReportDiscoveryMixin, SSHDiscoveryMixin):
                         }
 
                 if sosreports:
-                    print(f"\n[INFO] SOSreport mode: {len(sosreports)} SOSreport(s) found")
+                    print(f"\n[INFO] SOSreport mode: {len(sosreports)} sosreports found")
 
                     # Extract detailed cluster configuration from the first available SOSreport
                     first_sosreport = list(sosreports.values())[0]
@@ -255,7 +255,7 @@ class AccessDiscovery(SOSReportDiscoveryMixin, SSHDiscoveryMixin):
 
                     if missing_sosreports:
                         print(
-                            f"\n[INFO] Cluster has {len(expected_nodes)} nodes, but only {len(sosreports)} SOSreport(s)"
+                            f"\n[INFO] Cluster has {len(expected_nodes)} nodes, but only {len(sosreports)} sosreports"
                         )
                         print(
                             f"       Missing SOSreports for: {', '.join(sorted(missing_sosreports))}"
@@ -464,7 +464,7 @@ class AccessDiscovery(SOSReportDiscoveryMixin, SSHDiscoveryMixin):
                         node_info["preferred_method"] = "sosreport"
                     updated_count += 1
             if updated_count > 0:
-                print(f"\n  [INFO] Found {updated_count} matching SOSreport(s) in subdirectories")
+                print(f"\n  [INFO] Found {updated_count} matching sosreports in subdirectories")
 
             # Discover cluster nodes from SOSreports and find their sosreports
             discovered_nodes = self._discover_cluster_from_sosreports(local_sosreports)

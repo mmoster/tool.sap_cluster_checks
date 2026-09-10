@@ -101,7 +101,7 @@ class SOSReportDiscoveryMixin:
                 archives.append(archive_path)
 
         if archives:
-            print(f"  Found {len(archives)} compressed SOSreport(s), checking/extracting...")
+            print(f"  Found {len(archives)} compressed sosreports, checking/extracting...")
             with ThreadPoolExecutor(max_workers=min(len(archives), 4)) as executor:
                 futures = {
                     executor.submit(self._extract_sosreport, arch): arch for arch in archives
