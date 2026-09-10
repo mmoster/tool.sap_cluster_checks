@@ -15,7 +15,7 @@ parser:
   type: regex
   multiline: true
   search_patterns:
-    - name: hana_master
+    - name: hana_promoted
       # Match: "Masters: [ node ]" or "Promoted: [ node ]"
       regex: "(Masters|Promoted):\\s*\\[\\s*(\\w+)"
       group: 0
@@ -37,7 +37,7 @@ validation_logic:
       operator: not_exists
       value: true
       message: "HANA System Replication reports errors"
-    - key: hana_master
+    - key: hana_promoted
       operator: exists
       value: true
-      message: "No HANA master found - System Replication may not be active"
+      message: "No promoted HANA instance found - System Replication may not be active"

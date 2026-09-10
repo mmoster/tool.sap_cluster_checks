@@ -15,11 +15,11 @@ parser:
   type: regex
   multiline: true
   search_patterns:
-    - name: master_node
+    - name: promoted_node
       # Match: "Masters: [ node ]" or "Promoted: [ node ]"
       regex: "(Masters|Promoted):\\s*\\[\\s*(\\w+)"
       group: 0
-    - name: slave_node
+    - name: unpromoted_node
       # Match: "Slaves: [ node ]" or "Unpromoted: [ node ]"
       regex: "(Slaves|Unpromoted):\\s*\\[\\s*(\\w+)"
       group: 0
@@ -30,11 +30,11 @@ parser:
 validation_logic:
   scope: cluster  # Site roles are cluster-wide
   expectations:
-    - key: master_node
+    - key: promoted_node
       operator: exists
       value: true
-      message: "No master/primary node detected"
-    - key: slave_node
+      message: "No primary/promoted node detected"
+    - key: unpromoted_node
       operator: exists
       value: true
-      message: "No slave/secondary node detected - no failover target"
+      message: "No secondary/unpromoted node detected - no failover target"

@@ -163,7 +163,7 @@ These operations do **not** affect the cluster, HANA, or SAP, but only the local
 | CHK_HANA_AUTOSTART | Checks the HANA autostart setting | `grep 'Autostart' .../profile/*` |
 | CHK_HADR_HOOKS | Checks HADR provider hook configuration | `cat global.ini`, `cat sudoers.d/*`, `rpm -q` |
 | CHK_REPLICATION_MODE | Checks the SR replication mode (sync/async) | `SAPHanaSR-showAttr`, `crm_mon -A1` |
-| CHK_MASTER_SLAVE_ROLES | Checks master/slave role assignment | `crm_mon -1`, `SAPHanaSR-showAttr` |
+| CHK_PROMOTED_ROLES | Checks promoted/unpromoted role assignment | `crm_mon -1`, `SAPHanaSR-showAttr` |
 | CHK_SITE_ROLES | Checks site roles (primary/secondary) | `pcs status`, `crm_mon -1` |
 | CHK_MAJORITY_MAKER | Checks majority maker configuration (scale-out) | `crm_node -l`, `pcs constraint location` |
 | CHK_PACKAGE_CONSISTENCY | Checks package versions across all nodes | `rpm -q pacemaker corosync ...` |

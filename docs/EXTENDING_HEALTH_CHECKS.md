@@ -22,7 +22,7 @@ Currently **22 checks** are defined:
 | `CHK_HANA_INSTALLED` | INFO | Detect HANA installation and running status |
 | `CHK_HANA_SR_STATUS` | CRITICAL | Verify HANA System Replication status |
 | `CHK_MAJORITY_MAKER` | CRITICAL | Validate majority maker configuration (Scale-Out) |
-| `CHK_MASTER_SLAVE_ROLES` | CRITICAL | Verify master/slave role consistency |
+| `CHK_PROMOTED_ROLES` | CRITICAL | Verify promoted/unpromoted role consistency |
 | `CHK_NODE_STATUS` | CRITICAL | Verify all cluster nodes are online |
 | `CHK_PACKAGE_CONSISTENCY` | WARNING | Verify package versions across nodes |
 | `CHK_QUORUM_CONFIG` | CRITICAL | Validate quorum configuration (Scale-Up) |

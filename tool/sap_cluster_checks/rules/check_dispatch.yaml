@@ -61,7 +61,7 @@ steps:
         parallel: true
         gate: hana_resource_running
         checks:
-          - check_id: CHK_MASTER_SLAVE_ROLES
+          - check_id: CHK_PROMOTED_ROLES
 
   sap:
     name: "SAP-Specific"

@@ -1,13 +1,13 @@
 # CHK_RESOURCE_STATUS - Verify SAP HANA resources are running
 #
 # Detects resource states:
-#   - running: Resource is active with Master/Slave or Promoted/Unpromoted roles
+#   - running: Resource is active with Promoted/Unpromoted roles
 #   - stopped: Resource is stopped (may be due to failure or manual stop)
 #   - disabled: Resource is intentionally disabled (target-role=Stopped)
 #   - unmanaged: Resource is set to unmanaged (is-managed=false)
 #   - absent: No SAP HANA resource found in cluster
 #
-# Downstream checks (CHK_MASTER_SLAVE_ROLES, CHK_SITE_ROLES, CHK_HANA_SR_STATUS)
+# Downstream checks (CHK_PROMOTED_ROLES, CHK_SITE_ROLES, CHK_HANA_SR_STATUS)
 # depend on this check passing to avoid misleading failures when resources are
 # intentionally stopped during maintenance.
 #

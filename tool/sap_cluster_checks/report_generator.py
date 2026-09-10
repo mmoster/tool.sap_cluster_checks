@@ -685,7 +685,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         warning_text = (
             f"The SAP HANA cluster resource is {hana_resource_state}. "
             "HANA is NOT managed by Pacemaker in this state. "
-            "Checks that depend on Pacemaker resource status (master/slave roles, site roles, "
+            "Checks that depend on Pacemaker resource status (promoted/unpromoted roles, site roles, "
             "SR status via Pacemaker) have been skipped. "
         )
 
@@ -919,7 +919,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                 pdf.sub_section("SAPHanaController Resource")
                 res_config["Resource Name"] = resource_name
                 res_config["Resource Agent"] = "SAPHanaController"
-                res_config["Clone Type"] = "promotable (master/slave)"
+                res_config["Clone Type"] = "promotable (promoted/unpromoted)"
                 res_config["interleave"] = "true"
                 if excluded_nodes:
                     res_config["Excluded Nodes"] = (
@@ -929,7 +929,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                 pdf.sub_section("SAPHana Resource")
                 res_config["Resource Name"] = resource_name
                 res_config["Resource Agent"] = "SAPHana"
-                res_config["Clone Type"] = "promotable (master/slave)"
+                res_config["Clone Type"] = "promotable (promoted/unpromoted)"
             pdf.info_table(res_config)
             pdf.ln(3)
 

@@ -113,7 +113,7 @@ Every check has a severity level: **CRITICAL** (must-fix for production), **WARN
 | CHK_RESOURCE_STATUS | CRITICAL | SAP HANA resources are running |
 | CHK_RESOURCE_FAILURES | WARNING | No failed resource operations |
 | CHK_ALERT_FENCING | WARNING | SAPHanaSR alert and fencing configuration |
-| CHK_MASTER_SLAVE_ROLES | CRITICAL | Master/slave role consistency |
+| CHK_PROMOTED_ROLES | CRITICAL | Promoted/unpromoted role consistency |
 | CHK_MAJORITY_MAKER | CRITICAL | Majority maker constraints (Scale-Out only) |
 
 ### SAP-Specific Checks

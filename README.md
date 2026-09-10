@@ -165,7 +165,7 @@ SOSreport Collection:
 | CHK_RESOURCE_STATUS | CRITICAL | Verify SAP HANA resources are running |
 | CHK_RESOURCE_FAILURES | WARNING | Detect failed resource operations |
 | CHK_ALERT_FENCING | WARNING | Validate SAPHanaSR-alert-fencing |
-| CHK_MASTER_SLAVE_ROLES | CRITICAL | Verify master/slave role consistency |
+| CHK_PROMOTED_ROLES | CRITICAL | Verify promoted/unpromoted role consistency |
 | CHK_MAJORITY_MAKER | CRITICAL | Validate majority maker constraints |
 
 ### SAP-Specific

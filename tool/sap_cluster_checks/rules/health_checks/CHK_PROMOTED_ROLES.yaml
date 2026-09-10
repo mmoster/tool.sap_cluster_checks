@@ -1,8 +1,8 @@
-# CHK_MASTER_SLAVE_ROLES - Verify master/slave role consistency
-check_id: CHK_MASTER_SLAVE_ROLES
+# CHK_PROMOTED_ROLES - Verify promoted/unpromoted role consistency
+check_id: CHK_PROMOTED_ROLES
 version: "1.1"
 severity: CRITICAL
-description: Verify exactly one master and one slave in HANA cluster
+description: Verify exactly one promoted and one unpromoted instance in HANA cluster
 enabled: true
 requires: CHK_RESOURCE_STATUS  # Skip if HANA resource is not running
 
@@ -17,11 +17,11 @@ parser:
   type: regex
   multiline: true
   search_patterns:
-    - name: master_count
+    - name: promoted_count
       # Match: "Masters: [ node ]", "Promoted: [ node ]", "Promoted node", "PROMOTED"
       regex: "(Masters:\\s*\\[|Promoted:\\s*\\[|Promoted\\s+\\S|PROMOTED)"
       group: 0
-    - name: slave_count
+    - name: unpromoted_count
       # Match: "Slaves: [ node ]", "Unpromoted: [ node ]", "Unpromoted node", "DEMOTED"
       regex: "(Slaves:\\s*\\[|Unpromoted:\\s*\\[|Unpromoted\\s+\\S|DEMOTED)"
       group: 0
@@ -32,11 +32,11 @@ parser:
 validation_logic:
   scope: cluster  # Role distribution is cluster-wide
   expectations:
-    - key: master_count
+    - key: promoted_count
       operator: exists
       value: true
-      message: "No master/promoted instance found"
-    - key: slave_count
+      message: "No promoted instance found"
+    - key: unpromoted_count
       operator: exists
       value: true
-      message: "No slave/unpromoted instance found - no failover target"
+      message: "No unpromoted instance found - no failover target"

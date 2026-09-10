@@ -48,7 +48,7 @@ Skipped if HANA resource is not running (stopped/disabled/unmanaged).
 
 | #  | Check ID                | Severity | Scope   | Description                                               |
 |----|-------------------------|----------|---------|-----------------------------------------------------------|
-| 15 | CHK_MASTER_SLAVE_ROLES  | CRITICAL | cluster | Verify exactly one master and one slave in cluster        |
+| 15 | CHK_PROMOTED_ROLES      | CRITICAL | cluster | Verify exactly one promoted and one unpromoted in cluster |
 
 ## Step 4: SAP-Specific
 
@@ -85,7 +85,7 @@ Verbose mode (`-v`) includes all checks, not just failures.
 ## Execution Model
 
 - **Steps** execute sequentially (1 → 2 → 3 → 4 → 5)
-- **Phases** within a step execute sequentially (phase 1 → phase 2) — this allows phase 2 to use results from phase 1 (e.g., `CHK_RESOURCE_STATUS` must run before `CHK_MASTER_SLAVE_ROLES`)
+- **Phases** within a step execute sequentially (phase 1 → phase 2) — this allows phase 2 to use results from phase 1 (e.g., `CHK_RESOURCE_STATUS` must run before `CHK_PROMOTED_ROLES`)
 - **Checks** within a phase execute in **parallel** (multithreaded) for performance
 - **Gates** control conditional execution: if a gate evaluates to false, all checks behind it are skipped with an explanatory message
 - **Topology filters** skip checks not applicable to the detected cluster type (e.g., `CHK_MAJORITY_MAKER` is skipped for Scale-Up)

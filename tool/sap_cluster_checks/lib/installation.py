@@ -485,7 +485,7 @@ CHECKS PERFORMED
   CHK_RESOURCE_STATUS    - All resources running
   CHK_RESOURCE_FAILURES  - No resource failures
   CHK_ALERT_FENCING      - Fencing alerts configured
-  CHK_MASTER_SLAVE_ROLES - Master/slave roles correct
+  CHK_PROMOTED_ROLES     - Promoted/unpromoted roles correct
   CHK_MAJORITY_MAKER     - Majority maker for 2-node clusters
 
 COMMON ISSUES & SOLUTIONS

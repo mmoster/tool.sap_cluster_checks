@@ -82,7 +82,7 @@ validation_logic:
     - key: controller_promotable
       operator: equals
       value: "true"
-      message: "SAPHanaController should be promotable (master/slave)"
+      message: "SAPHanaController should be promotable (promoted/unpromoted)"
     - key: topology_clone_node_max
       operator: equals
       value: "1"
