@@ -40,4 +40,4 @@ validation_logic:
     - key: hana_promoted
       operator: exists
       value: true
-      message: "No promoted HANA instance found - System Replication may not be active"
+      message: "No HANA primary found - System Replication may not be active"

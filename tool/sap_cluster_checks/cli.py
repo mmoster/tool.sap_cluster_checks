@@ -1521,13 +1521,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 print("=" * 63)
 
             elif failed_checks:
-                print()
-                print("-" * 63)
-                print(" Failed Checks (CRITICAL issues):")
-                for r in failed_checks:
-                    if hasattr(r, "severity") and r.severity == Severity.CRITICAL:
-                        print(f"  - {r.check_id}: {r.message}")
-                print("-" * 63)
+                pass  # Failures already shown in STEP 5 report
 
             else:
                 # All checks passed - show healthy banner
@@ -1662,19 +1656,6 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         if failed:
             failed_labels = [step_names.get(s, s) for s in failed]
             print(f"\n[WARNING] Steps with failures: {', '.join(failed_labels)}")
-            # Show which checks actually failed in each step
-            for step in failed:
-                if step in step_checks and self.check_results:
-                    check_ids = step_checks[step]
-                    failed_checks = [
-                        r for r in self.check_results
-                        if r.check_id in check_ids
-                        and r.status == CheckStatus.FAILED
-                    ]
-                    for r in failed_checks:
-                        sev = "CRIT" if r.severity == Severity.CRITICAL else "WARN"
-                        node_str = f" ({r.node})" if r.node else ""
-                        print(f"  [{sev}] {r.check_id}{node_str}: {r.message}")
 
         # Save step results for --suggest to use
         status_file = self.config_dir / "last_run_status.yaml"
