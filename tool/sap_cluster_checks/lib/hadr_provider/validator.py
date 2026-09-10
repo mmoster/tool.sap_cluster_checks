@@ -65,6 +65,9 @@ class HadrValidator:
     ) -> List[Finding]:
         findings: List[Finding] = []
 
+        # Collect execution_order values across hooks for uniqueness check
+        execution_orders: Dict[str, str] = {}  # section_name -> execution_order
+
         for hook in expected.hooks:
             _actual_name, section = self._ci_get(
                 actual.global_ini_sections, hook.section_name
@@ -91,6 +94,37 @@ class HadrValidator:
             # Section exists -- validate individual keys
             findings.extend(self._check_hook_values(actual, hook, section))
 
+            # Track execution_order for cross-hook uniqueness check
+            eo = section.get("execution_order")
+            if eo is not None:
+                execution_orders[_actual_name or hook.section_name] = eo
+
+        # Check for duplicate execution_order values across hooks
+        seen: Dict[str, str] = {}  # execution_order -> first section_name
+        for section_name, eo in execution_orders.items():
+            if eo in seen:
+                findings.append(
+                    Finding(
+                        category="global_ini",
+                        severity="WARNING",
+                        what_is_wrong=(
+                            f"Duplicate execution_order '{eo}' in "
+                            f"[{section_name}] and [{seen[eo]}]"
+                        ),
+                        expected_value="unique execution_order per hook",
+                        actual_value=f"execution_order = {eo} (shared)",
+                        fix_description=(
+                            f"Change execution_order in [{section_name}] to a "
+                            f"unique value (different from {eo})"
+                        ),
+                        fix_command="",
+                        node=actual.node,
+                        section=section_name,
+                    )
+                )
+            else:
+                seen[eo] = section_name
+
         return findings
 
     def _check_hook_values(
@@ -107,7 +141,6 @@ class HadrValidator:
         checks = [
             ("provider", hook.provider),
             ("path", hook.path),
-            ("execution_order", str(hook.execution_order)),
         ]
         if hook.action_on_lost is not None:
             checks.append(("action_on_lost", hook.action_on_lost))
@@ -115,14 +148,13 @@ class HadrValidator:
         for key, expected_val in checks:
             actual_val = section.get(key)
             if actual_val is None:
-                severity = "WARNING" if key == "execution_order" else "CRITICAL"
                 desc, cmd = generate_fix_for_wrong_value(
                     hook.section_name, key, expected_val, "missing", actual.sid
                 )
                 findings.append(
                     Finding(
                         category="global_ini",
-                        severity=severity,
+                        severity="CRITICAL",
                         what_is_wrong=f"Key '{key}' missing in [{hook.section_name}]",
                         expected_value=f"{key} = {expected_val}",
                         actual_value="missing",
@@ -136,14 +168,13 @@ class HadrValidator:
                 # action_on_lost accepts multiple valid values (stop, fence)
                 if key == "action_on_lost" and actual_val in _ACTION_ON_LOST_VALID:
                     continue
-                severity = "WARNING" if key == "execution_order" else "CRITICAL"
                 desc, cmd = generate_fix_for_wrong_value(
                     hook.section_name, key, expected_val, actual_val, actual.sid
                 )
                 findings.append(
                     Finding(
                         category="global_ini",
-                        severity=severity,
+                        severity="CRITICAL",
                         what_is_wrong=(
                             f"Wrong '{key}' in [{hook.section_name}]: "
                             f"'{actual_val}' (expected '{expected_val}')"

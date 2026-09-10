@@ -369,6 +369,131 @@ class TestSudoersSapHaRole:
         )
 
 
+class TestExecutionOrderUniqueness:
+    """execution_order values must be unique across hooks, but the specific value doesn't matter."""
+
+    def test_different_execution_orders_no_warning(self):
+        """Hooks with different execution_order values should produce no finding."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_hanasr]\n"
+                "provider = HanaSR\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "\n"
+                "[ha_dr_provider_chksrv]\n"
+                "provider = ChkSrv\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 3\n"
+                "action_on_lost = stop\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_hanasr = info\n"
+                "ha_dr_chksrv = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_angi.txt').read_text(),
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        eo_findings = [f for f in findings if 'execution_order' in f.what_is_wrong]
+        assert len(eo_findings) == 0, (
+            f"Non-standard but unique execution_order should not produce findings, "
+            f"got: {[f.what_is_wrong for f in eo_findings]}"
+        )
+
+    def test_swapped_execution_orders_no_warning(self):
+        """SR=2, ChkSrv=1 is fine -- order doesn't matter, only uniqueness."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_hanasr]\n"
+                "provider = HanaSR\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 2\n"
+                "\n"
+                "[ha_dr_provider_chksrv]\n"
+                "provider = ChkSrv\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "action_on_lost = stop\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_hanasr = info\n"
+                "ha_dr_chksrv = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_angi.txt').read_text(),
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        eo_findings = [f for f in findings if 'execution_order' in f.what_is_wrong]
+        assert len(eo_findings) == 0
+
+    def test_duplicate_execution_orders_warning(self):
+        """Same execution_order on both hooks should produce a WARNING."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_hanasr]\n"
+                "provider = HanaSR\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "\n"
+                "[ha_dr_provider_chksrv]\n"
+                "provider = ChkSrv\n"
+                "path = /usr/share/sap-hana-ha/\n"
+                "execution_order = 1\n"
+                "action_on_lost = stop\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_hanasr = info\n"
+                "ha_dr_chksrv = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_angi.txt').read_text(),
+            provider_files='/usr/share/sap-hana-ha/HanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(9, Topology.SCALE_UP, ArchType.ANGI, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        dup_findings = [f for f in findings
+                        if 'duplicate' in f.what_is_wrong.lower()
+                        and 'execution_order' in f.what_is_wrong]
+        assert len(dup_findings) == 1
+        assert dup_findings[0].severity == 'WARNING'
+
+    def test_legacy_different_execution_orders_no_warning(self):
+        """Legacy hooks with non-standard but unique execution_order should pass."""
+        raw = _build_raw(
+            global_ini=(
+                "[ha_dr_provider_SAPHanaSR]\n"
+                "provider = SAPHanaSR\n"
+                "path = /usr/share/SAPHanaSR\n"
+                "execution_order = 5\n"
+                "\n"
+                "[ha_dr_provider_suschksrv]\n"
+                "provider = susChkSrv\n"
+                "path = /usr/share/SAPHanaSR\n"
+                "execution_order = 10\n"
+                "action_on_lost = stop\n"
+                "\n"
+                "[trace]\n"
+                "ha_dr_saphanasr = info\n"
+            ),
+            sudoers=(FIXTURES / 'sudoers_legacy.txt').read_text(),
+            provider_files='/usr/share/SAPHanaSR/SAPHanaSR.py',
+        )
+        actual = parse_collected_output(raw, 'node1', 'S4D')
+        expected = get_expected_config(8, Topology.SCALE_UP, ArchType.LEGACY, 'S4D')
+
+        findings = HadrValidator().validate(actual, expected)
+        eo_findings = [f for f in findings if 'execution_order' in f.what_is_wrong]
+        assert len(eo_findings) == 0
+
+
 class TestFindingSuggestions:
     """Verify all findings have non-empty fix descriptions and commands."""
 
