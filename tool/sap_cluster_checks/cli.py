@@ -1837,11 +1837,9 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
     def _print_next_steps(self, results: dict):
         """Print suggested next steps based on results."""
-        print("\n")
-        print("=" * 63)
+        print()
         print("=" * 63)
         print(" NEXT STEPS")
-        print("=" * 63)
         print("=" * 63)
 
         # Check what was done and suggest next actions
