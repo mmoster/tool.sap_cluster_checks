@@ -96,7 +96,6 @@ class AccessDiscovery(SOSReportDiscoveryMixin, SSHDiscoveryMixin):
         self.config_dir.mkdir(parents=True, exist_ok=True)
         with open(self.config_path, "w", encoding="utf-8") as f:
             yaml.dump(asdict(self.config), f, default_flow_style=False)
-        print(f"Configuration saved to {self.config_path}")
 
     def discover_all(self) -> AccessConfig:
         """
