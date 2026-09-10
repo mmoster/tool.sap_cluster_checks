@@ -203,7 +203,6 @@ def check_sos_sap_extensions(hostname: str, ssh_user: str = "root") -> dict:
         "reachable": False,
         "sos_conf_ok": False,
         "extras_ok": False,
-        "hadr_script_ok": False,
         "sos_extras_installed": False,
     }
 
@@ -235,13 +234,6 @@ def check_sos_sap_extensions(hostname: str, ssh_user: str = "root") -> dict:
             else
                 echo "EXTRAS_OK=no"
             fi
-
-            # Check if HADR collection script is deployed
-            if [ -x /usr/local/sbin/sap-ha-collect-hadr ]; then
-                echo "HADR_SCRIPT_OK=yes"
-            else
-                echo "HADR_SCRIPT_OK=no"
-            fi
             """,
         ]
 
@@ -261,7 +253,6 @@ def check_sos_sap_extensions(hostname: str, ssh_user: str = "root") -> dict:
             result["sos_extras_installed"] = "SOS_INSTALLED=yes" in output
             result["sos_conf_ok"] = "SOS_CONF_OK=yes" in output
             result["extras_ok"] = "EXTRAS_OK=yes" in output
-            result["hadr_script_ok"] = "HADR_SCRIPT_OK=yes" in output
         else:
             result["reachable"] = False
 
@@ -295,26 +286,12 @@ pcs resource config
 pcs constraint config
 cibadmin --query --scope resources
 cibadmin --query --scope constraints
-/usr/local/sbin/sap-ha-collect-hadr
-"""
-
-    # Script that collects HA/DR provider hook configuration
-    # (global.ini, sudoers, provider files, packages, RHEL version)
-    # Output uses section markers so the CHK_HADR_HOOKS parser can split it.
-    hadr_collect_script = """#!/bin/bash
-# SAP HANA HA/DR provider hook data collection for SOSreport
-# Generates marker-delimited output for CHK_HADR_HOOKS analysis
-echo '=== GLOBAL_INI ==='
-cat /hana/shared/*/global/hdb/custom/config/global.ini 2>/dev/null \\
-  || cat /usr/sap/*/SYS/global/hdb/custom/config/global.ini 2>/dev/null
-echo '=== SUDOERS ==='
-cat /etc/sudoers.d/20-saphana /etc/sudoers.d/*sap* /etc/sudoers.d/*hana* 2>/dev/null
-echo '=== PROVIDER_FILES ==='
-ls /usr/share/sap-hana-ha/HanaSR.py /usr/share/SAPHanaSR/SAPHanaSR.py 2>&1
-echo '=== PACKAGES ==='
-rpm -q sap-hana-ha resource-agents-sap-hana resource-agents-sap-hana-scaleout 2>/dev/null
-echo '=== RHEL ==='
-cat /etc/redhat-release 2>/dev/null
+cat /hana/shared/*/global/hdb/custom/config/global.ini
+cat /usr/sap/*/SYS/global/hdb/custom/config/global.ini
+cat /etc/sudoers.d/20-saphana /etc/sudoers.d/*sap* /etc/sudoers.d/*hana*
+ls /usr/share/sap-hana-ha/HanaSR.py /usr/share/SAPHanaSR/SAPHanaSR.py
+rpm -q sap-hana-ha resource-agents-sap-hana resource-agents-sap-hana-scaleout
+cat /etc/redhat-release
 """
 
     # Commands to deploy configuration
@@ -322,12 +299,6 @@ cat /etc/redhat-release 2>/dev/null
     deploy_script = f"""
 # Create directories if needed
 {sudo_prefix}mkdir -p /etc/sos/extras.d
-
-# Deploy HADR collection script
-cat << 'HADREOF' | {sudo_prefix}tee /usr/local/sbin/sap-ha-collect-hadr >/dev/null
-{hadr_collect_script}
-HADREOF
-{sudo_prefix}chmod +x /usr/local/sbin/sap-ha-collect-hadr
 
 # Check if sos.conf already has SAP plugins configured
 if grep -q 'saphana' /etc/sos/sos.conf 2>/dev/null && grep -q 'sos_extras' /etc/sos/sos.conf 2>/dev/null; then
@@ -392,13 +363,6 @@ if [ -f /etc/sos/extras.d/sap_hana_ha ] && grep -q 'SAPHanaSR-showAttr' /etc/sos
     echo "EXTRAS_DEPLOYED_OK"
 else
     echo "EXTRAS_DEPLOY_FAILED"
-fi
-
-# Verify HADR collection script
-if [ -x /usr/local/sbin/sap-ha-collect-hadr ]; then
-    echo "HADR_SCRIPT_OK"
-else
-    echo "HADR_SCRIPT_FAILED"
 fi
 """
 

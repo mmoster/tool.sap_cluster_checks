@@ -1026,14 +1026,19 @@ class RulesEngine:
 
         # Skip if data is insufficient (SOSreport mode or empty output)
         if not has_required_data(raw_output):
-            return CheckResult(
-                check_id=rule.check_id,
-                description=rule.description,
-                status=CheckStatus.SKIPPED,
-                severity=Severity[rule.severity],
-                message="Skipped: requires SSH/local access (SOSreport data insufficient)",
-                node=node,
-            )
+            # Try reconstructing from individual sos_extras files (new-style, no script)
+            reconstructed = self._reconstruct_hadr_from_extras(node)
+            if reconstructed and has_required_data(reconstructed):
+                raw_output = reconstructed
+            else:
+                return CheckResult(
+                    check_id=rule.check_id,
+                    description=rule.description,
+                    status=CheckStatus.SKIPPED,
+                    severity=Severity[rule.severity],
+                    message="Skipped: requires SSH/local access (SOSreport data insufficient)",
+                    node=node,
+                )
 
         # Gather context from prior check results
         rhel_major = self._get_rhel_major()
@@ -1144,6 +1149,127 @@ class RulesEngine:
             },
             node=node,
         )
+
+    def _resolve_node_sosreport_dir(self, node: str) -> Optional[Path]:
+        """Resolve the SOSreport directory for a given node.
+
+        Looks up the node's sosreport_path from access_config, then resolves
+        it to the actual directory containing etc/, sos_commands/, etc.
+        """
+        nodes = self.access_config.get("nodes", {})
+        node_info = nodes.get(node, {})
+        sos_base = node_info.get("sosreport_path") or self.access_config.get(
+            "sosreport_directory"
+        )
+        if not sos_base:
+            return None
+
+        sos_base_path = Path(sos_base)
+        if (sos_base_path / "etc").exists():
+            return sos_base_path
+
+        node_sos = sos_base_path / node
+        if not node_sos.exists():
+            for item in sos_base_path.iterdir():
+                if item.is_dir() and node in item.name:
+                    return item
+        return node_sos if node_sos.exists() else None
+
+    def _reconstruct_hadr_from_extras(self, node: str) -> Optional[str]:
+        """Reconstruct combined HADR output from individual sos_extras files.
+
+        New-style SOSreports (without the sap-ha-collect-hadr script) store
+        each command's output as a separate file in sos_commands/sos_extras/sap_hana_ha/.
+        This method reads those files and reassembles them with section markers
+        so the existing parser pipeline works unchanged.
+
+        File naming convention: sos_extras replaces '/' with '.' and spaces with '_'.
+        """
+        import glob as glob_module
+
+        node_sos = self._resolve_node_sosreport_dir(node)
+        if not node_sos:
+            return None
+
+        extras_dir = node_sos / "sos_commands" / "sos_extras" / "sap_hana_ha"
+        if not extras_dir.is_dir():
+            return None
+
+        sections = []
+
+        # === GLOBAL_INI ===
+        # cat /hana/shared/*/global/hdb/custom/config/global.ini
+        # cat /usr/sap/*/SYS/global/hdb/custom/config/global.ini
+        global_ini_content = ""
+        for pattern in ["cat_*global.ini*"]:
+            matches = glob_module.glob(str(extras_dir / pattern))
+            for m in sorted(matches):
+                try:
+                    global_ini_content += Path(m).read_text(encoding="utf-8")
+                except Exception:
+                    pass
+        sections.append("=== GLOBAL_INI ===")
+        sections.append(global_ini_content)
+
+        # === SUDOERS ===
+        # cat /etc/sudoers.d/20-saphana /etc/sudoers.d/*sap* /etc/sudoers.d/*hana*
+        sudoers_content = ""
+        for pattern in ["cat_*sudoers*"]:
+            matches = glob_module.glob(str(extras_dir / pattern))
+            for m in sorted(matches):
+                try:
+                    sudoers_content += Path(m).read_text(encoding="utf-8")
+                except Exception:
+                    pass
+        sections.append("=== SUDOERS ===")
+        sections.append(sudoers_content)
+
+        # === PROVIDER_FILES ===
+        # ls /usr/share/sap-hana-ha/HanaSR.py /usr/share/SAPHanaSR/SAPHanaSR.py
+        provider_content = ""
+        for pattern in ["ls_*sap-hana-ha*", "ls_*SAPHanaSR*"]:
+            matches = glob_module.glob(str(extras_dir / pattern))
+            for m in sorted(matches):
+                try:
+                    provider_content += Path(m).read_text(encoding="utf-8")
+                except Exception:
+                    pass
+        sections.append("=== PROVIDER_FILES ===")
+        sections.append(provider_content)
+
+        # === PACKAGES ===
+        # rpm -q sap-hana-ha resource-agents-sap-hana ...
+        packages_content = ""
+        for pattern in ["rpm_*sap-hana*", "rpm_*resource-agents-sap-hana*"]:
+            matches = glob_module.glob(str(extras_dir / pattern))
+            for m in sorted(matches):
+                try:
+                    packages_content += Path(m).read_text(encoding="utf-8")
+                except Exception:
+                    pass
+        sections.append("=== PACKAGES ===")
+        sections.append(packages_content)
+
+        # === RHEL ===
+        # cat /etc/redhat-release
+        rhel_content = ""
+        for pattern in ["cat_*redhat-release*"]:
+            matches = glob_module.glob(str(extras_dir / pattern))
+            for m in sorted(matches):
+                try:
+                    rhel_content += Path(m).read_text(encoding="utf-8")
+                except Exception:
+                    pass
+        sections.append("=== RHEL ===")
+        sections.append(rhel_content)
+
+        result = "\n".join(sections)
+
+        # Only return if we found at least global.ini data (minimum for useful analysis)
+        if not global_ini_content.strip():
+            return None
+
+        return result
 
     def _get_rhel_major(self) -> int:
         """Get RHEL major version from access config or prior results."""
@@ -1459,14 +1585,20 @@ class RulesEngine:
             self._access_methods_used[node] = method
 
         if not success:
-            return CheckResult(
-                check_id=rule.check_id,
-                description=rule.description,
-                status=CheckStatus.ERROR,
-                severity=Severity[rule.severity],
-                message=f"Failed to get data: {output[:100]}",
-                node=node,
-            )
+            # For custom checks in SOSreport mode, let the check handler
+            # decide what to do (e.g. reconstruct data from alternate files)
+            custom_check = rule.validation_logic.get("custom_check")
+            if custom_check and method == "sosreport":
+                output = ""
+            else:
+                return CheckResult(
+                    check_id=rule.check_id,
+                    description=rule.description,
+                    status=CheckStatus.ERROR,
+                    severity=Severity[rule.severity],
+                    message=f"Failed to get data: {output[:100]}",
+                    node=node,
+                )
 
         # Parse output
         parsed = self._parse_output(output, rule.parser)

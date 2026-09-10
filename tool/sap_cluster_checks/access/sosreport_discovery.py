@@ -160,15 +160,23 @@ class SOSReportDiscoveryMixin:
             extras_path = Path(sos_path) / "sos_commands/sos_extras/sap_hana_ha"
             _saphana_path = Path(sos_path) / "sos_commands/saphana"  # noqa: F841
 
-            # Check for extended data: SAPHanaSR-showAttr or HADR collect script output
+            # Check for extended data: SAPHanaSR-showAttr or HADR data
+            # (old-style: single script output, new-style: individual command files)
             has_sr_attr = (
                 (extras_path / "SAPHanaSR-showAttr").exists() if extras_path.exists() else False
             )
-            has_hadr = (
-                (extras_path / "usr.local.sbin.sap-ha-collect-hadr").exists()
-                if extras_path.exists()
-                else False
-            )
+            has_hadr = False
+            if extras_path.exists():
+                # Old-style: single script output
+                if (extras_path / "usr.local.sbin.sap-ha-collect-hadr").exists():
+                    has_hadr = True
+                else:
+                    # New-style: individual command files (check for redhat-release
+                    # or rpm output as indicators)
+                    has_hadr = bool(
+                        list(extras_path.glob("cat_*redhat-release*"))
+                        or list(extras_path.glob("rpm_*sap-hana*"))
+                    )
 
             if has_sr_attr or has_hadr:
                 has_extended.append(hostname)
