@@ -2039,7 +2039,7 @@ class RulesEngine:
         print(f"\nRunning {len(self.rules)} checks on {len(nodes)} node(s)...")
 
         for rule in self.rules:
-            print(f"\n  [{rule.severity}] {rule.check_id}: {rule.description[:40]}...")
+            print(f"\n  [{rule.severity}] {rule.check_id}: {rule.description}")
             check_results = self.run_check(rule, nodes)
 
             for result in check_results:
@@ -2051,7 +2051,7 @@ class RulesEngine:
                     CheckStatus.ERROR: "!",
                 }.get(result.status, "?")
                 node_str = f" ({result.node})" if result.node else ""
-                print(f"    {status_icon} {result.status.value}{node_str}: {result.message[:60]}")
+                print(f"    {status_icon} {result.status.value}{node_str}: {result.message}")
 
         return self.results
 
@@ -2099,11 +2099,11 @@ class RulesEngine:
         if summary["critical_failures"]:
             print("\n  CRITICAL FAILURES:")
             for r in summary["critical_failures"]:
-                print(f"    - [{r.check_id}] {r.message[:50]}")
+                print(f"    - [{r.check_id}] {r.message}")
 
         if summary["warnings"]:
             print("\n  WARNINGS:")
             for r in summary["warnings"][:5]:  # Show first 5
-                print(f"    - [{r.check_id}] {r.message[:50]}")
+                print(f"    - [{r.check_id}] {r.message}")
             if len(summary["warnings"]) > 5:
                 print(f"    ... and {len(summary['warnings']) - 5} more")

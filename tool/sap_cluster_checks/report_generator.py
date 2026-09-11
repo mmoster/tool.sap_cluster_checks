@@ -236,13 +236,7 @@ class HealthCheckPDF(FPDF):
         self.set_x(30)
         self.set_font("Helvetica", "", 8)
         self.set_text_color(*PdfColors.GRAY)
-        self.cell(
-            0,
-            5,
-            description[:80] + ("..." if len(description) > 80 else ""),
-            new_x="LMARGIN",
-            new_y="NEXT",
-        )
+        self.multi_cell(170, 4, description)
 
         # Message and node if present
         if message or node:
