@@ -1241,7 +1241,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         # Cluster info summary
         if self._detected_topology or self._detected_arch_type:
             topo = self._detected_topology or "unknown"
-            print(f"\n  Cluster Type:        {topo}")
+            print(f"\n  HANA Landscape:      {topo}")
             print(f"  Resource Agent:      {self._get_resource_agent_label()}")
 
         print(f"\n  Total Checks Run:    {total}")
@@ -1454,14 +1454,14 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 print(f"Cluster: {cluster_name}")
             print(f"Nodes checked: {', '.join(sorted(nodes))}")
 
-            # Show detected cluster type from CHK_CLUSTER_TYPE
+            # Show detected HANA landscape from CHK_CLUSTER_TYPE
             if self.check_results:
                 for r in self.check_results:
                     if hasattr(r, "check_id") and r.check_id == "CHK_CLUSTER_TYPE":
                         cluster_type = (
                             r.details.get("cluster_type", "Unknown") if r.details else "Unknown"
                         )
-                        print(f"Cluster Type: {cluster_type}")
+                        print(f"HANA Landscape: {cluster_type}")
                         if r.message and "configuration" in r.message:
                             print(f"  ({r.message})")
                         break

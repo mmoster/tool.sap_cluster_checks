@@ -759,7 +759,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     pdf.info_table(
         {
-            "Cluster Type": cluster_info.get("cluster_type", "Scale-Up"),
+            "HANA Landscape": cluster_info.get("cluster_type", "Scale-Up"),
             "Node Count": str(len(nodes)),
             "Pacemaker": cluster_info.get("pacemaker_version", "N/A"),
         }

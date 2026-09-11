@@ -1,8 +1,8 @@
-# CHK_CLUSTER_TYPE - Detect SAP HANA HA configuration type
+# CHK_CLUSTER_TYPE - Detect SAP HANA landscape (Scale-Up vs Scale-Out)
 check_id: CHK_CLUSTER_TYPE
 version: "2.2"
 severity: INFO
-description: Detect SAP HANA HA cluster configuration (Scale-Up vs Scale-Out)
+description: Detect SAP HANA landscape (Scale-Up vs Scale-Out)
 enabled: true
 
 # Scale-Up: 2 HANA instances (1 per site), uses SAPHana or SAPHanaController with clone-max=2

@@ -133,9 +133,9 @@ def show_config(config_path: Path, cluster_or_node: str = None, config_only: boo
                 print(f"      hana_sid: {sid}")
                 print(f'      hana_instance_number: "{inst}"')
 
-                # Cluster type
+                # HANA landscape
                 cluster_type = "Scale-Up" if resource_type == "SAPHana" else "Scale-Out"
-                print(f"      cluster_type: {cluster_type}")
+                print(f"      hana_landscape: {cluster_type}")
 
                 # Node Information
                 node1_hostname = info.get("node1_hostname", "")
@@ -260,11 +260,11 @@ def show_config(config_path: Path, cluster_or_node: str = None, config_only: boo
                 print("\n    Cluster Configuration (SID not stored):")
                 print("    " + "-" * 44)
 
-                # Resource type and cluster type
+                # Resource type and HANA landscape
                 resource_type = info.get("resource_type", "")
                 if resource_type:
                     cluster_type = "Scale-Up" if resource_type == "SAPHana" else "Scale-Out"
-                    print(f"      cluster_type: {cluster_type}")
+                    print(f"      hana_landscape: {cluster_type}")
                     print(f"      resource_type: {resource_type}")
 
                 # Node Information
