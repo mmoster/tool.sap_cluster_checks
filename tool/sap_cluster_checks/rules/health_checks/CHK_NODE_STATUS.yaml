@@ -2,7 +2,7 @@
 check_id: CHK_NODE_STATUS
 version: "1.0"
 severity: CRITICAL
-description: Verify all cluster nodes are online
+description: Verify all cluster nodes are online and active
 enabled: true
 
 source_definitions:
@@ -19,6 +19,9 @@ parser:
     - name: offline_nodes
       regex: "(OFFLINE|Offline:.*\\S)"
       group: 0
+    - name: standby_nodes
+      regex: "(standby|Standby:.*\\S)"
+      group: 0
     - name: online_nodes
       regex: "(Online|online)"
       group: 0
@@ -30,6 +33,11 @@ validation_logic:
       operator: not_exists
       value: true
       message: "One or more cluster nodes are OFFLINE"
+    - key: standby_nodes
+      operator: not_exists
+      value: true
+      severity: WARNING
+      message: "One or more cluster nodes are in standby — not managed by Pacemaker"
     - key: online_nodes
       operator: exists
       value: true
