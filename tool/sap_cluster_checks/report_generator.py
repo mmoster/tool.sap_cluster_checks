@@ -1354,26 +1354,38 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     # Skipped checks
     if skipped_checks:
         pdf.sub_section(f"Skipped Checks ({len(skipped_checks)})")
-        pdf.set_font("Helvetica", "I", 9)
-        pdf.set_text_color(*PdfColors.GRAY)
-        # Group skip reasons for a meaningful summary
-        skip_reasons = set()
-        for c in skipped_checks:
-            msg = c.get("message", "")
-            if "not installed" in msg.lower():
-                skip_reasons.add("SAP HANA not installed")
-            elif "legacy scale-up" in msg.lower():
-                skip_reasons.add("not applicable (legacy scale-up)")
-            elif "majority maker" in msg.lower():
-                skip_reasons.add("not applicable (Majority Maker)")
-            elif "scale-out" in msg.lower() or "scale-up" in msg.lower():
-                skip_reasons.add("not applicable (cluster type)")
-            elif "not applicable" in msg.lower():
-                skip_reasons.add("not applicable")
-            else:
-                skip_reasons.add("not applicable")
-        reason_text = ", ".join(sorted(skip_reasons)) if skip_reasons else "not applicable"
-        pdf.body_text(f"Skipped {len(skipped_checks)} checks ({reason_text})")
+
+        if verbose:
+            # Verbose mode: show each skipped check with its reason
+            for check in skipped_checks:
+                pdf.check_result_row(
+                    check.get("check_id", "N/A"),
+                    check.get("description", ""),
+                    check.get("status", "SKIPPED"),
+                    check.get("message", ""),
+                    check.get("node", ""),
+                )
+        else:
+            # Compact mode: one-line summary with grouped reasons
+            pdf.set_font("Helvetica", "I", 9)
+            pdf.set_text_color(*PdfColors.GRAY)
+            skip_reasons = set()
+            for c in skipped_checks:
+                msg = c.get("message", "")
+                if "not installed" in msg.lower():
+                    skip_reasons.add("SAP HANA not installed")
+                elif "legacy scale-up" in msg.lower():
+                    skip_reasons.add("not applicable (legacy scale-up)")
+                elif "majority maker" in msg.lower():
+                    skip_reasons.add("not applicable (Majority Maker)")
+                elif "scale-out" in msg.lower() or "scale-up" in msg.lower():
+                    skip_reasons.add("not applicable (cluster type)")
+                elif "not applicable" in msg.lower():
+                    skip_reasons.add("not applicable")
+                else:
+                    skip_reasons.add("not applicable")
+            reason_text = ", ".join(sorted(skip_reasons)) if skip_reasons else "not applicable"
+            pdf.body_text(f"Skipped {len(skipped_checks)} checks ({reason_text})")
 
     # =========================================================================
     # RECOMMENDATIONS
