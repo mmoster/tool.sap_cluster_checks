@@ -103,6 +103,7 @@ class HanaStatusMixin:
             "disabled": "resource disabled via target-role=Stopped",
             "stopped": "resource stopped",
             "unmanaged": "resource set to is-managed=false",
+            "maintenance": "resource in maintenance mode (maintenance meta attribute set)",
             "absent": "no HANA resource configured",
         }.get(self._hana_resource_state, f"resource {self._hana_resource_state}")
         print(f"  [INFO] HANA is NOT managed by the cluster ({state_detail})")

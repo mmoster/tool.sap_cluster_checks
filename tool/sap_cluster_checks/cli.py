@@ -172,7 +172,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         self.verbose_pdf = verbose_pdf  # Show all checks in detail in PDF
         self.majority_makers = []  # Nodes that are majority makers (Scale-Out)
         self.last_pdf_file = None  # Track last generated PDF for auto-open
-        self._hana_resource_state = "unknown"  # running/stopped/disabled/unmanaged/absent
+        self._hana_resource_state = "unknown"  # running/stopped/disabled/unmanaged/maintenance/absent
         self._hana_installed = False  # Whether HANA is installed on any node
         self._hana_db_status = {}  # HANA DB status and replication info
         self._detected_topology = None  # 'Scale-Up' or 'Scale-Out'
@@ -1170,6 +1170,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         has_resource = parsed.get("sap_hana_resource") is not None
         if not has_resource:
             return "absent"
+        if parsed.get("resource_maintenance") is not None:
+            return "maintenance"
         if parsed.get("resource_unmanaged") is not None:
             return "unmanaged"
         if parsed.get("resource_started") is not None:
@@ -1529,6 +1531,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                     "stopped",
                     "disabled",
                     "unmanaged",
+                    "maintenance",
                 )
                 print()
                 print("=" * 63)

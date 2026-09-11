@@ -5,6 +5,7 @@
 #   - stopped: Resource is stopped (may be due to failure or manual stop)
 #   - disabled: Resource is intentionally disabled (target-role=Stopped)
 #   - unmanaged: Resource is set to unmanaged (is-managed=false)
+#   - maintenance: Resource has maintenance meta attribute set (maintenance=true)
 #   - absent: No SAP HANA resource found in cluster
 #
 # Downstream checks (CHK_PROMOTED_ROLES, CHK_SITE_ROLES, CHK_HANA_SR_STATUS)
@@ -28,7 +29,9 @@ source_definitions:
     # Use grep -A2 to capture the 2 lines after each SAPHana match (clone children)
     HANA_LINES=$(echo "$OUTPUT" | grep -iE -A2 'SAPHana|SAPHanaController|rsc_SAPHana')
     if [ -n "$HANA_LINES" ]; then
-      if echo "$HANA_LINES" | grep -qi 'unmanaged'; then
+      if echo "$HANA_LINES" | grep -qi '(maintenance)'; then
+        echo "HANA_RESOURCE_STATE=maintenance"
+      elif echo "$HANA_LINES" | grep -qi 'unmanaged'; then
         echo "HANA_RESOURCE_STATE=unmanaged"
       elif echo "$HANA_LINES" | grep -qiE 'Started|Master|Slave|Promoted|Unpromoted'; then
         # Running takes precedence: ancillary resources (SAPHanaFil) may be
@@ -70,6 +73,9 @@ parser:
     - name: resource_unmanaged
       regex: "(unmanaged)"
       group: 0
+    - name: resource_maintenance
+      regex: "(\\(maintenance\\))"
+      group: 0
     - name: hana_resource_state
       regex: "HANA_RESOURCE_STATE=(\\w+)"
       group: 1
@@ -91,3 +97,6 @@ validation_logic:
     - key: resource_unmanaged
       operator: info_if_exists
       pass_message: "HANA resource is in unmanaged state"
+    - key: resource_maintenance
+      operator: info_if_exists
+      pass_message: "HANA resource is in maintenance mode (maintenance meta attribute set)"

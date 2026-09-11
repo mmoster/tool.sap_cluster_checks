@@ -497,7 +497,9 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     # Determine overall status considering both checks and installation
     hana_resource_state = cluster_info.get("hana_resource_state")
-    resources_not_managed = hana_resource_state in ("stopped", "disabled", "unmanaged")
+    resources_not_managed = hana_resource_state in (
+        "stopped", "disabled", "unmanaged", "maintenance",
+    )
 
     status_descriptions = {
         "CRITICAL - INCOMPLETE": "Critical issues found and installation incomplete",
@@ -674,11 +676,14 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     # HANA RESOURCE NOT MANAGED WARNING
     # =========================================================================
     hana_resource_state = cluster_info.get("hana_resource_state")
-    if hana_resource_state and hana_resource_state in ("stopped", "disabled", "unmanaged"):
+    if hana_resource_state and hana_resource_state in (
+        "stopped", "disabled", "unmanaged", "maintenance",
+    ):
         state_descriptions = {
             "stopped": "HANA resource is stopped in Pacemaker",
             "disabled": "HANA resource is disabled in Pacemaker (target-role=Stopped)",
             "unmanaged": "HANA resource is in unmanaged state",
+            "maintenance": "HANA resource is in maintenance mode",
         }
 
         warning_title = f"WARNING: {state_descriptions.get(hana_resource_state)}"
@@ -708,6 +713,10 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             warning_text += "To start the resource: pcs resource start <resource_name>"
         elif hana_resource_state == "unmanaged":
             warning_text += "To restore management: pcs resource manage <resource_name>"
+        elif hana_resource_state == "maintenance":
+            warning_text += (
+                "To exit maintenance: pcs resource meta <resource_name> maintenance=false"
+            )
 
         # Yellow warning box (same style as "Cluster Not Running")
         pdf.set_fill_color(255, 243, 205)  # Light yellow background

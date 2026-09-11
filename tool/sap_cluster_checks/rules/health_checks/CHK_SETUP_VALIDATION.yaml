@@ -38,5 +38,5 @@ validation_logic:
   expectations:
     - key: maintenance_mode
       operator: not_exists
-      value: true
-      message: "Cluster is in maintenance mode"
+      severity: CRITICAL
+      message: "Cluster is in maintenance mode - Pacemaker is NOT managing any resources. Disable maintenance mode before running checks: pcs property set maintenance-mode=false"
