@@ -6,7 +6,17 @@ description: Verify all cluster nodes are online and active
 enabled: true
 
 source_definitions:
-  live_cmd: "crm_mon -1 -r 2>/dev/null || pcs status nodes 2>/dev/null"
+  live_cmd: |
+    OUTPUT=$(crm_mon -1 -r 2>/dev/null || pcs status nodes 2>/dev/null)
+    echo "$OUTPUT"
+    STANDBY=$(echo "$OUTPUT" | sed -n 's/.*Standby:\s*\[\s*\(.*\)\s*\].*/\1/p')
+    if [ -z "$STANDBY" ]; then
+      STANDBY=$(echo "$OUTPUT" | sed -n 's/.*Node\s\+\(\S\+\):\s*standby.*/\1/Ip' | tr '\n' ' ')
+    fi
+    STANDBY=$(echo "$STANDBY" | xargs)
+    if [ -n "$STANDBY" ]; then
+      echo "STANDBY_NODE_LIST=$(echo $STANDBY | tr ' ' ',')"
+    fi
   sos_path: "sos_commands/pacemaker/crm_mon_-1*"
   # Fallback: run pcs -f cib.xml locally when cluster was stopped
   sos_cmd: "pcs -f {file} status nodes 2>/dev/null"
@@ -25,6 +35,9 @@ parser:
     - name: online_nodes
       regex: "(Online|online)"
       group: 0
+    - name: standby_node_list
+      regex: "STANDBY_NODE_LIST=(.*)"
+      group: 1
 
 validation_logic:
   scope: cluster  # Cluster-wide status, only needs one node
@@ -33,11 +46,6 @@ validation_logic:
       operator: not_exists
       value: true
       message: "One or more cluster nodes are OFFLINE"
-    - key: standby_nodes
-      operator: not_exists
-      value: true
-      severity: WARNING
-      message: "One or more cluster nodes are in standby - not managed by Pacemaker"
     - key: online_nodes
       operator: exists
       value: true

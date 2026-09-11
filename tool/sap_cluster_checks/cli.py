@@ -179,6 +179,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         self._detected_arch_type = None  # 'legacy' or 'angi' (from detect_arch_type)
         self._install_results = []  # CHK_HANA_INSTALLED results (for _gather_hana_db_status)
         self._hana_nodes = {}  # Nodes where HANA is installed (filtered node dict)
+        self._standby_nodes = []  # Nodes in standby (from CHK_NODE_STATUS)
 
         # Load dispatch manifest
         self.dispatch = CheckDispatch()
@@ -968,6 +969,39 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                                     f"(topology {chk_entry.topology} vs {self._detected_topology})"
                                 )
 
+        # Extract standby node names from CHK_NODE_STATUS
+        node_status_result = next(
+            (r for r in results if r.check_id == "CHK_NODE_STATUS"), None
+        )
+        if node_status_result and node_status_result.details:
+            parsed = node_status_result.details.get("parsed", {})
+            # Primary: structured standby_node_list from live_cmd
+            standby_list = parsed.get("standby_node_list")
+            if standby_list:
+                self._standby_nodes = [
+                    n.strip() for n in standby_list.split(",") if n.strip()
+                ]
+            elif parsed.get("standby_nodes"):
+                # SOSreport fallback: parse bracket format "Standby: [ node1 node2 ]"
+                match = re.search(
+                    r"Standby:\s*\[\s*(.*?)\s*\]", parsed["standby_nodes"]
+                )
+                if match:
+                    self._standby_nodes = match.group(1).split()
+                else:
+                    # Node-centric format: "Node dc2hana2: standby"
+                    match = re.search(
+                        r"Node\s+(\S+):\s*standby",
+                        parsed["standby_nodes"],
+                        re.IGNORECASE,
+                    )
+                    if match:
+                        self._standby_nodes = [match.group(1)]
+            if self._standby_nodes:
+                self._debug_print(
+                    f"Standby nodes detected: {', '.join(self._standby_nodes)}"
+                )
+
     def _post_pacemaker_phase1(self, results: list):
         """After pacemaker phase 1: extract HANA resource state and majority maker."""
         self._hana_resource_state = self._extract_hana_resource_state(results)
@@ -1148,6 +1182,53 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             print(
                 "         To include it: sos report -o saphana"
             )
+
+        # Cross-check: detect HANA still running on standby nodes
+        self._detect_phantom_stopped_resources()
+
+    def _detect_phantom_stopped_resources(self):
+        """Detect HANA processes still running on standby nodes.
+
+        When a node is put in standby, Pacemaker reports HANA as Stopped
+        but SAPHanaController does not actually stop the HANA instance.
+        This creates a phantom-stopped state where HANA runs unmanaged.
+        """
+        if not self._standby_nodes:
+            return
+        if self._hana_resource_state != "running":
+            return
+
+        # Collect nodes where HANA processes are running
+        hana_running_nodes = set()
+        for r in self._install_results:
+            if r.details:
+                parsed = r.details.get("parsed", {})
+                if parsed.get("hana_running") == "yes" and r.node:
+                    hana_running_nodes.add(r.node)
+
+        # Intersect: standby nodes where HANA is still running
+        phantom_nodes = [n for n in self._standby_nodes if n in hana_running_nodes]
+        if not phantom_nodes:
+            return
+
+        node_list = ", ".join(phantom_nodes)
+        message = (
+            f"HANA resource reported as Stopped on {node_list} but HANA processes "
+            f"are still running - node is in standby and SAPHanaController does not "
+            f"stop HANA on standby"
+        )
+        print(f"  [WARN] {message}")
+
+        # Inject synthetic WARNING result on CHK_RESOURCE_STATUS
+        phantom_result = CheckResult(
+            check_id="CHK_RESOURCE_STATUS",
+            description="HANA running unmanaged on standby node",
+            status=CheckStatus.FAILED,
+            severity=Severity.WARNING,
+            message=message,
+            node=node_list,
+        )
+        self.check_results.append(phantom_result)
 
     def _extract_hana_resource_state(self, results: list) -> str:
         """Extract HANA resource state from CHK_RESOURCE_STATUS results.

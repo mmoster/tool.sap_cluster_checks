@@ -1479,6 +1479,30 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         )
         priority += 1
 
+    if any(
+        c.get("check_id") == "CHK_RESOURCE_STATUS"
+        and "still running" in c.get("message", "")
+        for c in all_failed
+    ):
+        pdf.recommendation_box(
+            str(priority),
+            "HANA Running on Standby Node",
+            "HANA processes are still running on a node that is in standby. "
+            "Pacemaker reports the resource as Stopped, but SAPHanaController "
+            "does not stop HANA when a node enters standby. The HANA instance "
+            "is running unmanaged outside cluster control.",
+            [
+                "# Diagnose: check node status and HANA processes\n"
+                "pcs status nodes\n"
+                "su - <sid>adm -c 'sapcontrol -nr <inst> -function GetProcessList'",
+                "# Option 1: Bring node back online\n"
+                "pcs node unstandby <node>",
+                "# Option 2: Stop HANA on the standby node\n"
+                "su - <sid>adm -c 'HDB stop'",
+            ],
+        )
+        priority += 1
+
     if priority == 1:  # No specific recommendations
         if warning_checks:
             pdf.body_text(
