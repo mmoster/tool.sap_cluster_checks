@@ -145,6 +145,8 @@ class HealthCheckPDF(FPDF):
         self.set_line_width(0.5)
         self.line(10, self.get_y(), 200, self.get_y())
         self.ln(5)
+        # Reset text color so subsequent content doesn't inherit heading color
+        self.set_text_color(*PdfColors.BLACK)
 
     def sub_section(self, title: str):
         """Subsection header"""
