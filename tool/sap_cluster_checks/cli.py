@@ -1035,8 +1035,9 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             f"HANA install check (raw): nodes_with={nodes_with_hana}, nodes_without={nodes_without_hana}"
         )
 
-        # Nodes excluded from HANA: majority makers (from _post_pacemaker_phase1)
+        # Nodes excluded from HANA: majority makers (Scale-Out only, from _post_pacemaker_phase1)
         # and any additional CIB constraint-based exclusions
+        is_scale_out = self._detected_topology == "Scale-Out"
         hana_excluded_nodes = set(self.majority_makers)
         if self.rules_engine:
             resource_config = self.rules_engine.get_cluster_resources_config()
@@ -1070,9 +1071,14 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 for result in self.check_results:
                     if result.check_id == "CHK_HANA_INSTALLED" and result.node == node_name:
                         result.status = CheckStatus.SKIPPED
-                        result.message = (
-                            "Node excluded from HANA resources by constraints (majority maker)"
-                        )
+                        if is_scale_out and node_name in self.majority_makers:
+                            result.message = (
+                                "Node excluded from HANA resources by constraints (majority maker)"
+                            )
+                        else:
+                            result.message = (
+                                "Node excluded from HANA resources by constraints"
+                            )
                         break
                 excluded_nodes_updated.append(node_name)
 
