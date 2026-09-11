@@ -828,17 +828,15 @@ class RulesEngine:
                 cluster_type = "Scale-Out"
                 details["inferred_from_hana_topology"] = True
                 message = (
-                    f"Scale-Out configuration inferred from HANA topology "
-                    f"({hdbnsutil_host_count} hosts per site, {node_count} cluster nodes) "
-                    f"- no SAPHana/SAPHanaController resources in CIB"
+                    f"Scale-Out configuration "
+                    f"({hdbnsutil_host_count} hosts per site, {node_count} cluster nodes)"
                 )
             elif hdbnsutil_host_count == 1:
                 cluster_type = "Scale-Up"
                 details["inferred_from_hana_topology"] = True
                 message = (
-                    f"Scale-Up configuration inferred from HANA topology "
-                    f"(1 host per site, {node_count} cluster nodes) "
-                    f"- no SAPHana/SAPHanaController resources in CIB"
+                    f"Scale-Up configuration "
+                    f"({node_count} cluster nodes)"
                 )
             else:
                 cluster_type = "Unknown"

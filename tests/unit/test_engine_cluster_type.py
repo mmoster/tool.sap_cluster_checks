@@ -254,7 +254,7 @@ class TestInferredFromHanaTopology:
         ))
         assert result.details["cluster_type"] == "Scale-Out"
         assert result.details["inferred_from_hana_topology"] is True
-        assert "inferred from HANA topology" in result.message
+        assert "Scale-Out configuration" in result.message
         assert "2 hosts per site" in result.message
 
     def test_scale_up_inferred(self):
@@ -269,8 +269,8 @@ class TestInferredFromHanaTopology:
         ))
         assert result.details["cluster_type"] == "Scale-Up"
         assert result.details["inferred_from_hana_topology"] is True
-        assert "inferred from HANA topology" in result.message
-        assert "1 host per site" in result.message
+        assert "Scale-Up configuration" in result.message
+        assert "2 cluster nodes" in result.message
 
     def test_large_scale_out_inferred(self):
         """3 hosts per site → Scale-Out inference."""
