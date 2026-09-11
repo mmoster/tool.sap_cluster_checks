@@ -1526,7 +1526,27 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 print("=" * 63)
 
             elif failed_checks:
-                pass  # Failures already shown in STEP 5 report
+                # Check if the only failure is cluster-wide maintenance mode
+                maintenance_failures = [
+                    r for r in failed_checks
+                    if r.check_id == "CHK_SETUP_VALIDATION"
+                    and "maintenance mode" in (r.message or "").lower()
+                ]
+                if maintenance_failures and len(failed_checks) == len(maintenance_failures):
+                    print()
+                    print("=" * 63)
+                    print("  ╔═══════════════════════════════════════════════════════╗")
+                    print("  ║                                                       ║")
+                    print("  ║        ⚠  CLUSTER IN MAINTENANCE MODE  ⚠              ║")
+                    print("  ║                                                       ║")
+                    print("  ║     Pacemaker is NOT managing any resources.          ║")
+                    print("  ║     Health check results may be inaccurate.           ║")
+                    print("  ║                                                       ║")
+                    print("  ║     To disable:                                       ║")
+                    print("  ║     pcs property set maintenance-mode=false           ║")
+                    print("  ║                                                       ║")
+                    print("  ╚═══════════════════════════════════════════════════════╝")
+                    print("=" * 63)
 
             else:
                 # All checks passed - show healthy banner
@@ -1539,13 +1559,22 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 print()
                 print("=" * 63)
                 if resources_not_managed:
+                    state_descriptions = {
+                        "maintenance": "is in maintenance mode",
+                        "unmanaged": "is in unmanaged state",
+                        "disabled": "is disabled (target-role=Stopped)",
+                        "stopped": "is stopped",
+                    }
+                    state_msg = state_descriptions.get(
+                        self._hana_resource_state,
+                        f"is {self._hana_resource_state}",
+                    )
                     print("  ╔═══════════════════════════════════════════════════════╗")
                     print("  ║                                                       ║")
-                    print("  ║         ⚠  CLUSTER CHECKS PASSED  ⚠                  ║")
+                    print("  ║        ⚠  RESOURCE NOT MANAGED  ⚠                     ║")
                     print("  ║                                                       ║")
                     print("  ║     All runnable checks passed, but HANA resource     ║")
-                    state_msg = f"is {self._hana_resource_state}"
-                    print(f"  ║     {state_msg:<42}       ║")
+                    print(f"  ║     {state_msg:<48}  ║")
                     print("  ║     and NOT managed by Pacemaker.                     ║")
                     print("  ║     Some checks were skipped.                         ║")
                     print("  ║                                                       ║")
