@@ -1337,7 +1337,10 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             except Exception as e:
                 print(f"  [WARN] PDF generation failed: {e}")
 
-        return len(critical_failures) == 0
+        # Report generation always succeeds if we get here — the report was
+        # written.  Health-check *content* (pass/fail) is conveyed via the
+        # per-step summaries, not via this return value.
+        return True
 
     def run_all_checks(self, force_rediscover: bool = False, skip_steps: list = None) -> int:
         """
@@ -1648,9 +1651,16 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                         details.append(f"{errors} errors")
                     detail_str = f" ({', '.join(details)})" if details else ""
                     print(f"  [{passed}/{total}] {name}{detail_str}")
+
+                    # List failed checks so the user doesn't have to scroll up
+                    failed_results = [
+                        r for r in step_results if r.status == CheckStatus.FAILED
+                    ]
+                    for r in failed_results:
+                        sev = "CRIT" if r.severity == Severity.CRITICAL else "WARN"
+                        print(f"           [{sev}] {r.check_id}: {r.message}")
             elif step == "report":
-                status_icon = "[OK]" if success else "[FAIL]"
-                print(f"  {status_icon} {name}")
+                print(f"  [OK] {name}")
             else:
                 status_icon = "[OK]" if success else "[FAIL]"
                 print(f"  {status_icon} {name}")
