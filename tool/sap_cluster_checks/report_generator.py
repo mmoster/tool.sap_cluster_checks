@@ -209,6 +209,15 @@ class HealthCheckPDF(FPDF):
         self, check_id: str, description: str, status: str, message: str = "", node: str = ""
     ):
         """Draw a check result row"""
+        # Estimate row height to avoid orphaned badges across page breaks:
+        # badge+check_id (6) + description (5) + message (4) + spacing (2) = ~17mm min
+        row_height = 17
+        if message:
+            # Estimate extra height for long wrapped messages
+            row_height += 4 * max(1, len(message) // 80)
+        if self.get_y() + row_height > self.h - self.b_margin:
+            self.add_page()
+
         # Background for alternating rows
         y_start = self.get_y()
 
@@ -219,14 +228,16 @@ class HealthCheckPDF(FPDF):
         # Check ID
         self.set_font("Helvetica", "B", 9)
         self.set_text_color(*PdfColors.BLACK)
-        self.cell(45, 6, check_id, ln=False)
+        self.cell(0, 6, check_id, new_x="LMARGIN", new_y="NEXT")
 
-        # Description
-        self.set_font("Helvetica", "", 9)
+        # Description (on separate line, indented)
+        self.set_x(30)
+        self.set_font("Helvetica", "", 8)
+        self.set_text_color(*PdfColors.GRAY)
         self.cell(
             0,
-            6,
-            description[:50] + ("..." if len(description) > 50 else ""),
+            5,
+            description[:80] + ("..." if len(description) > 80 else ""),
             new_x="LMARGIN",
             new_y="NEXT",
         )
@@ -1483,7 +1494,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         pdf.cell(60, 6, title)
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*PdfColors.BLUE)
-        pdf.cell(0, 6, url, new_x="LMARGIN", new_y="NEXT")
+        pdf.cell(0, 6, url, new_x="LMARGIN", new_y="NEXT", link=url)
         pdf.set_text_color(*PdfColors.BLACK)
 
     # =========================================================================
