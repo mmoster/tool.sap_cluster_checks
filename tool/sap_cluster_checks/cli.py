@@ -977,7 +977,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
         # Extract majority maker from CHK_MAJORITY_MAKER results
         # This works in all modes (SSH, local, SOSreport) and provides a unified
-        # source for majority maker detection — the CIB parser in
+        # source for majority maker detection - the CIB parser in
         # _build_cluster_report_data() serves as an additional source.
         for r in results:
             if r.check_id == "CHK_MAJORITY_MAKER" and r.details:
@@ -1365,7 +1365,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             except Exception as e:
                 print(f"  [WARN] PDF generation failed: {e}")
 
-        # Report generation always succeeds if we get here — the report was
+        # Report generation always succeeds if we get here - the report was
         # written.  Health-check *content* (pass/fail) is conveyed via the
         # per-step summaries, not via this return value.
         return True

@@ -1,8 +1,8 @@
 # SAP HA Cluster Health Check: Automated Analysis for Pacemaker Clusters
 
-Managing SAP HANA High Availability clusters on Pacemaker/Corosync is complex. A single misconfiguration — a missing STONITH device, incorrect quorum settings, or a broken HA/DR hook — can mean the difference between a seamless failover and an outage. Troubleshooting these issues typically requires deep knowledge and hours of sifting through `crm_mon` output, `corosync.conf`, and SAP-specific log files.
+Managing SAP HANA High Availability clusters on Pacemaker/Corosync is complex. A single misconfiguration - a missing STONITH device, incorrect quorum settings, or a broken HA/DR hook - can mean the difference between a seamless failover and an outage. Troubleshooting these issues typically requires deep knowledge and hours of sifting through `crm_mon` output, `corosync.conf`, and SAP-specific log files.
 
-**sap-cluster-checks** is an open-source tool that automates this entire process. It runs 22 automated health checks against your SAP HANA Pacemaker cluster, generates PDF reports, and works with live clusters, remote SSH connections, or offline SOSreport analysis — all from a single Python script with no heavyweight dependencies.
+**sap-cluster-checks** is an open-source tool that automates this entire process. It runs 22 automated health checks against your SAP HANA Pacemaker cluster, generates PDF reports, and works with live clusters, remote SSH connections, or offline SOSreport analysis - all from a single Python script with no heavyweight dependencies.
 
 **GitHub:** [https://github.com/mmoster/tool.sap_cluster_checks](https://github.com/mmoster/tool.sap_cluster_checks)
 
@@ -16,7 +16,7 @@ Managing SAP HANA High Availability clusters on Pacemaker/Corosync is complex. A
 - **PDF reports**: auto-generated, with optional verbose mode for audits
 - **Multithreaded execution**: parallel node checks and rule evaluation
 - **Supports RHEL 8, 9, and 10** with SAP HANA Scale-Up and Scale-Out topologies
-- **Extensible**: add custom checks as YAML rule files — no Python coding required
+- **Extensible**: add custom checks as YAML rule files - no Python coding required
 - **Automation-ready**: designed for cron jobs, CI/CD pipelines, and non-interactive environments
 
 ---
@@ -43,7 +43,7 @@ cd tool.sap_cluster_checks-main
 ### First Run
 
 ```bash
-# On a cluster node — the simplest way
+# On a cluster node - the simplest way
 ./sap_cluster_checks.py --local
 
 # Remote check via SSH (auto-discovers all cluster members from one node)
@@ -64,14 +64,14 @@ That's it. The tool discovers the cluster topology, runs all checks, and generat
 You don't need to know every node in your cluster. Provide a single seed node, and the tool automatically discovers all cluster members from the Pacemaker configuration:
 
 ```bash
-# Just provide one node — the tool finds the rest
+# Just provide one node - the tool finds the rest
 ./sap_cluster_checks.py hana01
 
 # The tool discovers hana02 (and any other members)
 # and runs checks across the entire cluster
 ```
 
-This works across all access methods — SSH, local execution, and SOSreport analysis. When analyzing SOSreports, it reads the `corosync.conf` inside the archive to identify all cluster members and resolves hostname aliases automatically.
+This works across all access methods - SSH, local execution, and SOSreport analysis. When analyzing SOSreports, it reads the `corosync.conf` inside the archive to identify all cluster members and resolves hostname aliases automatically.
 
 ### Multi-Cluster Support
 
@@ -134,7 +134,7 @@ Every check has a severity level: **CRITICAL** (must-fix for production), **WARN
 
 ### Example 1: Local Cluster Check
 
-Run directly on a cluster node — the most common approach:
+Run directly on a cluster node - the most common approach:
 
 ```bash
 ./sap_cluster_checks.py --local
@@ -165,14 +165,14 @@ For support engineers and consultants, or when you need to analyze a cluster sta
 ./sap_cluster_checks.py -s /path/to/sosreports/
 ```
 
-Supported formats: `.tar.xz`, `.tar.gz`, `.tar.bz2`, and plain `.tar` — all auto-extracted in parallel.
+Supported formats: `.tar.xz`, `.tar.gz`, `.tar.bz2`, and plain `.tar` - all auto-extracted in parallel.
 
 ### Example 4: Complete SOSreport Collection Workflow
 
 A single command that discovers the cluster, configures SAP-specific SOSreport extensions, creates SOSreports on all nodes in parallel, and fetches them via SCP:
 
 ```bash
-# Provide any cluster node — all others are discovered
+# Provide any cluster node - all others are discovered
 ./sap_cluster_checks.py -R hana01
 
 # Auto-configure SAP extensions without prompting
@@ -256,7 +256,7 @@ The tool auto-generates a PDF report containing:
 - Summary counts (PASSED / FAILED / SKIPPED / ERROR)
 - Detailed results table with check ID, node, status, severity, and messages
 
-Use `-v` for **verbose PDF reports** that document every single check with full details — not just failures. This is ideal for audits, compliance reviews, or handover documentation:
+Use `-v` for **verbose PDF reports** that document every single check with full details - not just failures. This is ideal for audits, compliance reviews, or handover documentation:
 
 ```bash
 ./sap_cluster_checks.py --local -v
@@ -269,7 +269,7 @@ Use `-v` for **verbose PDF reports** that document every single check with full 
 The tool adapts to your environment automatically:
 
 - **RHEL & Pacemaker version detection**: Reads `/etc/redhat-release` and the installed Pacemaker RPM. Checks are tailored to RHEL 8, 9, or 10. Documentation references in the PDF report point to the correct RHEL version.
-- **Cluster type detection**: Distinguishes Scale-Up from Scale-Out based on the `clone-max` value in the CIB. Checks are filtered accordingly — Scale-Out-only checks (like majority maker validation) are skipped on Scale-Up clusters.
+- **Cluster type detection**: Distinguishes Scale-Up from Scale-Out based on the `clone-max` value in the CIB. Checks are filtered accordingly - Scale-Out-only checks (like majority maker validation) are skipped on Scale-Up clusters.
 - **Architecture detection**: Identifies whether you're running the modern ANGI resource agent (`sap-hana-ha`) or the legacy agents (`resource-agents-sap-hana`), skipping checks that don't apply.
 - **HANA SID & instance discovery**: Detects the `sidadm` user, SID, instance number, and checks whether the database is running.
 - **Cluster status awareness**: If Pacemaker or Corosync isn't running, the tool warns you and falls back to static analysis from `corosync.conf`.
@@ -299,7 +299,7 @@ New to the tool or troubleshooting a failed check? The built-in guidance system 
 ./sap_cluster_checks.py --list-steps
 ```
 
-The `--suggest` feature analyzes your last run results and provides targeted remediation advice for failing checks — saving you from searching through documentation manually.
+The `--suggest` feature analyzes your last run results and provides targeted remediation advice for failing checks - saving you from searching through documentation manually.
 
 ---
 
@@ -345,11 +345,11 @@ You can also scope checks to a specific Ansible inventory group:
 
 Health checks are defined as YAML rule files in `rules/health_checks/CHK_*.yaml`. The architecture separates:
 
-1. **Data Collection** — how to get data (commands to run or files to read)
-2. **Parsing** — how to extract values from command output
-3. **Validation** — what conditions to check
+1. **Data Collection** - how to get data (commands to run or files to read)
+2. **Parsing** - how to extract values from command output
+3. **Validation** - what conditions to check
 
-This means the same validation logic works on both live systems and SOSreports. Adding a new check requires no Python coding — just create a YAML file following the rule format.
+This means the same validation logic works on both live systems and SOSreports. Adding a new check requires no Python coding - just create a YAML file following the rule format.
 
 The dispatch manifest (`rules/check_dispatch.yaml`) controls:
 - Which checks run in which step and phase
@@ -376,16 +376,16 @@ See [EXTENDING_HEALTH_CHECKS.md](EXTENDING_HEALTH_CHECKS.md) for the full techni
 | `-s, --sosreport-dir DIR` | Directory containing SOSreport archives/directories |
 | `-g, --group GROUP` | Only check hosts from this Ansible inventory group |
 | `-C, --cluster NAME` | Use saved cluster by name (from previous discovery) |
-| `-u, --usage` | Interactive mode — scan directory for resources |
+| `-u, --usage` | Interactive mode - scan directory for resources |
 
 ### Output & Reporting
 
 | Option | Description |
 |--------|-------------|
-| `-v, --verbose` | Verbose PDF — show all checks in detail (not just failures) |
+| `-v, --verbose` | Verbose PDF - show all checks in detail (not just failures) |
 | `--no-pdf` | Skip PDF report generation |
 | `-d, --debug` | Enable debug mode (show config files and step progress) |
-| `--strict` | Strict mode — all checks required, optional checks become errors |
+| `--strict` | Strict mode - all checks required, optional checks become errors |
 
 ### Discovery & Configuration
 
@@ -445,12 +445,12 @@ See [EXTENDING_HEALTH_CHECKS.md](EXTENDING_HEALTH_CHECKS.md) for the full techni
 
 ## Tips & Best Practices
 
-1. **First run takes longer** — it discovers and caches cluster topology. Subsequent runs reuse the cache.
+1. **First run takes longer** - it discovers and caches cluster topology. Subsequent runs reuse the cache.
 2. **Use `-f` to force re-discovery** if cluster nodes changed.
-3. **SOSreport analysis is safe** — completely offline, no SSH access needed.
-4. **Use `-v` for audit-ready PDFs** — documents every check, not just failures.
-5. **Cluster not running?** — the tool detects this and falls back to static configuration analysis.
-6. **Multiple clusters?** — the tool prompts you to select which one to analyze.
+3. **SOSreport analysis is safe** - completely offline, no SSH access needed.
+4. **Use `-v` for audit-ready PDFs** - documents every check, not just failures.
+5. **Cluster not running?** - the tool detects this and falls back to static configuration analysis.
+6. **Multiple clusters?** - the tool prompts you to select which one to analyze.
 7. **Use `--suggest`** after a failed run to get targeted remediation advice.
 8. **Share PDF reports** with support teams or attach to audit documentation.
 
@@ -471,4 +471,4 @@ cd tool.sap_cluster_checks
 
 ---
 
-*sap-cluster-checks is an open-source project. Contributions, feedback, and feature requests are welcome — open an issue or submit a pull request on GitHub.*
+*sap-cluster-checks is an open-source project. Contributions, feedback, and feature requests are welcome - open an issue or submit a pull request on GitHub.*

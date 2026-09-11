@@ -1,4 +1,4 @@
-"""Tests for CheckDispatch — dispatch manifest loading and querying."""
+"""Tests for CheckDispatch - dispatch manifest loading and querying."""
 
 from pathlib import Path
 
@@ -68,7 +68,7 @@ class TestGetPhases:
 
     def test_with_scale_up_topology_filters(self, dispatch):
         phases = dispatch.get_phases("test_step", detected_topology="Scale-Up")
-        # Phase 1: CHK_A (all), CHK_B (Scale-Up) — CHK_C (Scale-Out) removed
+        # Phase 1: CHK_A (all), CHK_B (Scale-Up) - CHK_C (Scale-Out) removed
         check_ids = [c.check_id for c in phases[0].checks]
         assert check_ids == ["CHK_A", "CHK_B"]
 

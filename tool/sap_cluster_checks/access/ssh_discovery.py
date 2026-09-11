@@ -449,7 +449,7 @@ class SSHDiscoveryMixin:
                     # If it contains 'value=', extract just the value
                     if "value=" in s:
                         s = s.split("value=")[-1].strip()
-                    # Filter out numeric site IDs (e.g. "100") — keep names like "DC1"
+                    # Filter out numeric site IDs (e.g. "100") - keep names like "DC1"
                     if s and len(s) <= 20 and not s.isdigit():
                         sites.append(s)
             sites = list(dict.fromkeys(sites))  # Remove duplicates while preserving order
@@ -990,7 +990,7 @@ class SSHDiscoveryMixin:
     def check_ssh_access(self, hostname: str, user: str = None) -> tuple:
         """Check SSH access to a host. Returns (reachable, user)."""
         # Fast pre-check: verify SSH port is open before attempting login.
-        # If port check fails, still try SSH — the host may be reachable via
+        # If port check fails, still try SSH - the host may be reachable via
         # ~/.ssh/config (ProxyJump, tunnel, HostName alias) which raw sockets
         # don't see.
         port_open = self._is_port_open(hostname)

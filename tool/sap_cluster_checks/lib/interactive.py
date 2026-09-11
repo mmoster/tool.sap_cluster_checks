@@ -224,7 +224,7 @@ USAGE EXAMPLES
         print("  [d]         Delete reports and start fresh")
         print("  [q]         Quit")
     else:
-        # No existing configuration — first run, offer usage guide
+        # No existing configuration - first run, offer usage guide
         while True:
             print("NO EXISTING CONFIGURATION")
             print()

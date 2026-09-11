@@ -8,11 +8,11 @@ py-version = "3.6"
 
 [tool.pylint."messages control"]
 disable = [
-    # Black handles formatting — disable conflicting layout rules
+    # Black handles formatting - disable conflicting layout rules
     "line-too-long",           # C0301 - Black wraps lines
     # "bad-whitespace" removed - no longer exists in pylint
 
-    # Too noisy for this codebase at this stage — will address in refactoring phase
+    # Too noisy for this codebase at this stage - will address in refactoring phase
     "too-many-arguments",       # R0913
     "too-many-positional-arguments", # R0917
     "too-many-locals",          # R0914
@@ -25,12 +25,12 @@ disable = [
     "too-few-public-methods",   # R0903
     "too-many-lines",           # C0302
 
-    # Docstring rules — not adding docstrings in the lint phase
+    # Docstring rules - not adding docstrings in the lint phase
     "missing-module-docstring",  # C0114
     "missing-class-docstring",   # C0115
     "missing-function-docstring",# C0116
 
-    # Import errors — pylint doesn't resolve all package-internal imports
+    # Import errors - pylint doesn't resolve all package-internal imports
     "import-error",             # E0401
 
     # Broad exception catching is intentional at error boundaries (SSH, subprocess, YAML, file I/O)

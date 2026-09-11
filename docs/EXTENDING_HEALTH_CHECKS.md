@@ -128,7 +128,7 @@ steps:
 
 ### Step 3: Verify
 
-Run the tool and check that your new check appears. The dispatch manifest is validated at startup against loaded YAML rule files — you'll see a warning if:
+Run the tool and check that your new check appears. The dispatch manifest is validated at startup against loaded YAML rule files - you'll see a warning if:
 - A check is in the manifest but has no YAML rule file
 - A YAML rule file exists but is not in the manifest
 
@@ -487,7 +487,7 @@ CHK_*.yaml  →  engine.run_check()  →  1. Check topology_filter
 
 The engine uses a **declarative approach** where you describe *what* to check, not *how* to check it. Adding new checks requires **only YAML edits**:
 
-1. **Rule file** (`CHK_*.yaml`) — defines data collection, parsing, and validation
-2. **Dispatch manifest** (`check_dispatch.yaml`) — defines when and where the check runs
+1. **Rule file** (`CHK_*.yaml`) - defines data collection, parsing, and validation
+2. **Dispatch manifest** (`check_dispatch.yaml`) - defines when and where the check runs
 
 The `rules/engine.py` handles command execution, SOSreport reading, regex parsing, expectation evaluation, and result aggregation. The `sap_cluster_checks.py` orchestrator handles step sequencing, gate evaluation, topology filtering, and post-phase state extraction.

@@ -54,7 +54,7 @@ class TestFetchSosreportsDefaultPath:
         config_path.parent.mkdir(parents=True, exist_ok=True)
         config_path.write_text("{}")
 
-        # The function reads the config and then tries to find nodes —
+        # The function reads the config and then tries to find nodes -
         # with empty config it will return early
         result = fetch_sosreports(config_path=config_path, nodes=["testnode"])
 
@@ -111,6 +111,6 @@ class TestOutputMessageConsistency:
                     violations.append(f"{filepath.name}:{i}: {stripped}")
 
         assert not violations, (
-            "Found '(s)' suffix in output messages — use plural 'sosreports' instead:\n"
+            "Found '(s)' suffix in output messages - use plural 'sosreports' instead:\n"
             + "\n".join(violations)
         )

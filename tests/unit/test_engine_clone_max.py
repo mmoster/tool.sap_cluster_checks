@@ -118,7 +118,7 @@ class TestEmptyStringValues:
         assert result.status in (CheckStatus.PASSED, CheckStatus.FAILED)
 
     def test_empty_interleave_treated_as_not_configured(self):
-        """Empty string interleave is treated same as None — not validated."""
+        """Empty string interleave is treated same as None - not validated."""
         result = _validate(_parsed(controller_interleave=""))
         assert result.status == CheckStatus.PASSED
 

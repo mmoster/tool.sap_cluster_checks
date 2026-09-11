@@ -1,4 +1,4 @@
-# SAP Cluster Health Check – Command Reference
+# SAP Cluster Health Check - Command Reference
 
 This document lists all health check commands executed on the cluster nodes and evaluates their potential impact on the cluster, HANA, or SAP configuration.
 

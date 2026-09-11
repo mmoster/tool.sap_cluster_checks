@@ -23,7 +23,7 @@ def get_redhat_doc_urls(rhel_major: int = 9) -> dict:
     ha = f"{base}/red_hat_enterprise_linux/{v}/html/configuring_and_managing_high_availability_clusters"
     sap_base = f"{base}/red_hat_enterprise_linux_for_sap_solutions/{v}"
     # SAP-specific guides: RHEL 8 uses "Automating...", RHEL 9+ uses "Deploying..."
-    # RHEL 10+ SAP deployment guides not yet published — use RHEL 9 URLs as fallback
+    # RHEL 10+ SAP deployment guides not yet published - use RHEL 9 URLs as fallback
     # TODO: When RHEL 10 SAP guides are published, bump cap to 10:
     #       sap_ver = v if v <= 10 else 10
     #       RHEL 10 is expected to use the same "Deploying..." slug as RHEL 9.

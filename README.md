@@ -2,13 +2,13 @@
 
 ## Why This Tool?
 
-Setting up and maintaining SAP HANA HA clusters on Pacemaker/Corosync is complex — there are dozens of configuration parameters, HA/DR provider hooks, fencing settings, and replication options that must all be correct for a reliable failover. Misconfigurations often go unnoticed until an actual failure occurs, when it's too late. This tool automates the validation of your cluster setup against SAP and Red Hat best practices, catching issues before they become outages.
+Setting up and maintaining SAP HANA HA clusters on Pacemaker/Corosync is complex - there are dozens of configuration parameters, HA/DR provider hooks, fencing settings, and replication options that must all be correct for a reliable failover. Misconfigurations often go unnoticed until an actual failure occurs, when it's too late. This tool automates the validation of your cluster setup against SAP and Red Hat best practices, catching issues before they become outages.
 
 It supports **RHEL 8, 9, and 10** with both classic (`resource-agents-sap-hana`) and modern ANGI (`sap-hana-ha`) resource agent packages, covering **Scale-Up** and **Scale-Out** topologies. Support for ASCS/ERS environments is planned for a future release.
 
 ## Who Can Use It?
 
-This tool is designed for **SAP Basis administrators, Linux system administrators, and consultants** responsible for SAP HANA HA clusters. It can be run directly on a cluster node, remotely via SSH, or offline against SOSreport archives — no agent installation required. Whether you're doing an initial setup validation, a periodic health check, or troubleshooting a replication issue, this tool gives you a clear pass/fail report with actionable findings.
+This tool is designed for **SAP Basis administrators, Linux system administrators, and consultants** responsible for SAP HANA HA clusters. It can be run directly on a cluster node, remotely via SSH, or offline against SOSreport archives - no agent installation required. Whether you're doing an initial setup validation, a periodic health check, or troubleshooting a replication issue, this tool gives you a clear pass/fail report with actionable findings.
 
 ## Quick Start
 
@@ -72,7 +72,7 @@ This is useful when you don't remember where your SOSreports are stored or want 
 - **Multiple Access Methods**: Local execution, SSH, Ansible inventory, or SOSreport analysis
 - **Multithreaded Execution**: Parallel node connectivity checks and rule execution
 - **22 Built-in Health Checks**: Cluster configuration, Pacemaker/Corosync, and SAP-specific validations
-- **Smart Auto-Discovery**: Provide a single seed node — the tool discovers all cluster members automatically from Pacemaker configuration
+- **Smart Auto-Discovery**: Provide a single seed node - the tool discovers all cluster members automatically from Pacemaker configuration
 - **Cluster Status Detection**: Warns if cluster services are not running, falls back to static config
 - **Multi-Cluster Support**: Prompts for selection when multiple clusters are discovered
 - **Version Detection**: Automatically detects RHEL and Pacemaker versions
@@ -280,7 +280,7 @@ Delete with `-D` to restart the investigation from scratch.
 
 ### Reusing Access Discovery
 
-By default, access discovery runs from scratch on every invocation — even if `cluster_access_config.yaml` already exists. This ensures the tool always reflects the current state of the cluster.
+By default, access discovery runs from scratch on every invocation - even if `cluster_access_config.yaml` already exists. This ensures the tool always reflects the current state of the cluster.
 
 To reuse the cached config from a previous run (e.g., in CI/CD pipelines or repeated testing), set the `SAP_HA_CHECK_REUSE_CONFIG` environment variable or use the `--reuse-config` flag:
 
@@ -304,13 +304,13 @@ SAP_HA_CHECK_REUSE_CONFIG=1 ./sap_cluster_checks.py -f
 
 ### Audit & Compliance Mode
 
-Use `-v` (verbose) to generate a complete PDF report documenting **all** health checks — not just failures. This is ideal for audits, compliance reviews, or handover documentation:
+Use `-v` (verbose) to generate a complete PDF report documenting **all** health checks - not just failures. This is ideal for audits, compliance reviews, or handover documentation:
 
 ```bash
 ./sap_cluster_checks.py --local -v
 ```
 
-The verbose report includes every check with its full result, the discovered cluster configuration, and system details — providing a complete snapshot of your cluster's health status.
+The verbose report includes every check with its full result, the discovered cluster configuration, and system details - providing a complete snapshot of your cluster's health status.
 
 ## Test Sequence
 
@@ -332,7 +332,7 @@ This is a one-line change. All report elements (headers, status badges, tables, 
 
 ## Extending Health Checks
 
-All 22 health checks are defined as YAML rule files — no Python code changes needed to add or modify checks. See [docs/EXTENDING_HEALTH_CHECKS.md](docs/EXTENDING_HEALTH_CHECKS.md) for details on adding new checks, updating existing ones (severity, expectations, regex patterns, scope), and the dispatch manifest reference.
+All 22 health checks are defined as YAML rule files - no Python code changes needed to add or modify checks. See [docs/EXTENDING_HEALTH_CHECKS.md](docs/EXTENDING_HEALTH_CHECKS.md) for details on adding new checks, updating existing ones (severity, expectations, regex patterns, scope), and the dispatch manifest reference.
 
 ## Requirements
 
@@ -353,12 +353,12 @@ This tool uses platform-specific commands and paths. The following matrix shows 
 | **Cluster Stack** | Pacemaker/Corosync with `pcs` CLI | Pacemaker/Corosync with `crmsh` (SUSE) |
 | **Cluster Topology** | Scale-Up (2+ nodes), Scale-Out (4+ nodes + majority maker) | ASCS/ERS (planned), standalone HANA |
 | **Resource Agents** | `sap-hana-ha` (ANGI, RHEL 9+), `resource-agents-sap-hana` (classic), `resource-agents-sap-hana-scaleout` (classic) | SUSE resource agents (`SAPHanaSR`, `SAPHanaSR-ScaleOut`) |
-| **Fencing** | All STONITH agents supported by RHEL | — |
+| **Fencing** | All STONITH agents supported by RHEL | - |
 | **Subscription** | Red Hat Subscription Manager (`subscription-manager`) | SUSEConnect, zypper |
 | **Package Manager** | `rpm`, `dnf`/`yum` | `zypper` |
 | **OS Detection** | `/etc/redhat-release` | `/etc/os-release` (generic), `/etc/SuSE-release` |
 | **Python** | 3.6+ (included in RHEL 8/9/10) | Python 2.x |
-| **Access Methods** | Local, SSH, Ansible, SOSreport | — |
+| **Access Methods** | Local, SSH, Ansible, SOSreport | - |
 
 > **Note:** Red Hat-specific dependencies include `pcs` (cluster CLI), `subscription-manager` (entitlement), `/etc/redhat-release` (version detection), and Red Hat-branded PDF report formatting. Contributions to support additional platforms are welcome.
 

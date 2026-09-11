@@ -37,7 +37,7 @@ validation_logic:
       operator: not_exists
       value: true
       severity: WARNING
-      message: "One or more cluster nodes are in standby — not managed by Pacemaker"
+      message: "One or more cluster nodes are in standby - not managed by Pacemaker"
     - key: online_nodes
       operator: exists
       value: true

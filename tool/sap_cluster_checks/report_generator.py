@@ -395,7 +395,7 @@ def _render_version_table(pdf, check):
         pdf.cell(node_col_width, row_height, display_node, border=1, fill=True, align="C")
     pdf.ln()
 
-    # Table rows — show version-release only (strip package name prefix)
+    # Table rows - show version-release only (strip package name prefix)
     for pkg_key, node_versions in version_table.items():
         pdf.set_x(14)
         display_name = pkg_display_names.get(pkg_key, pkg_key)
@@ -412,7 +412,7 @@ def _render_version_table(pdf, check):
         for node in all_nodes:
             version = node_versions.get(node, "N/A")
             version_str = str(version) if version else "not installed"
-            # Strip package name prefix — row label already shows it
+            # Strip package name prefix - row label already shows it
             version_str = _strip_pkg_prefix(version_str, pkg_key)
             # Highlight cells that differ from the reference node
             if has_diff and str(version) != str(ref_value):

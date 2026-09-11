@@ -20,8 +20,8 @@ The tool relies on RHEL-specific components:
 
 The following operating systems are **not supported**:
 
-- **SUSE Linux Enterprise Server for SAP Applications** (SLES for SAP) — not supported. SLES uses different cluster management tooling (`crmsh` instead of `pcs`), different package names (`SAPHanaSR`, `SAPHanaSR-ScaleOut`), and different OS detection mechanisms (`/etc/os-release`, `/etc/SuSE-release`). These differences make SLES incompatible with this tool in its current version.
-- **Other Linux distributions** (Debian, Ubuntu, Oracle Linux, etc.) — not supported.
+- **SUSE Linux Enterprise Server for SAP Applications** (SLES for SAP) - not supported. SLES uses different cluster management tooling (`crmsh` instead of `pcs`), different package names (`SAPHanaSR`, `SAPHanaSR-ScaleOut`), and different OS detection mechanisms (`/etc/os-release`, `/etc/SuSE-release`). These differences make SLES incompatible with this tool in its current version.
+- **Other Linux distributions** (Debian, Ubuntu, Oracle Linux, etc.) - not supported.
 
 ### Supported Cluster Stack
 
@@ -29,7 +29,7 @@ The following operating systems are **not supported**:
 
 ### Unsupported Cluster Stacks
 
-- **Pacemaker/Corosync** with `crmsh` (SUSE) — this tool requires the `pcs` CLI
+- **Pacemaker/Corosync** with `crmsh` (SUSE) - this tool requires the `pcs` CLI
 - Other cluster frameworks (Veritas, Windows Server Failover Clustering, etc.) are not applicable
 
 ---
@@ -49,7 +49,7 @@ The following operating systems are **not supported**:
 
 - Only **SAP HANA System Replication (HSR)** clusters managed by Pacemaker are validated
 - Non-HANA workloads running in the same cluster are not inspected
-- Multi-SID configurations on a single cluster have limited support — the tool focuses on the primary HANA SID detected
+- Multi-SID configurations on a single cluster have limited support - the tool focuses on the primary HANA SID detected
 - Active/Active (read-enabled) secondary configurations are detected but not all aspects are specifically validated
 
 ---
@@ -187,7 +187,7 @@ Health checks are classified as CRITICAL, WARNING, or INFO based on general best
 - Health checks within a phase run in parallel using `ThreadPoolExecutor`
 - Phases run sequentially due to data dependencies (e.g., SAP checks depend on HANA detection)
 - SSH command execution is subject to network latency and SSH connection limits
-- No configurable timeout for individual health check commands — commands that hang (e.g., due to unresponsive nodes) may delay the overall check
+- No configurable timeout for individual health check commands - commands that hang (e.g., due to unresponsive nodes) may delay the overall check
 - The tool is designed for one-time checks, not continuous monitoring
 
 ---
@@ -196,10 +196,10 @@ Health checks are classified as CRITICAL, WARNING, or INFO based on general best
 
 - The tool executes commands on cluster nodes via SSH or locally with the user's privileges
 - Node names and SSH usernames are sanitized with `shlex.quote()` before being interpolated into SSH commands to prevent shell injection
-- No credentials are stored by the tool itself — it relies on SSH keys or the current user session
+- No credentials are stored by the tool itself - it relies on SSH keys or the current user session
 - SOSreport archives may contain sensitive data (hostnames, IP addresses, SAP SIDs, configuration details) and should be handled according to your organization's data handling policies
 - The `cluster_access_config.yaml` file stores discovered node information (hostnames, access methods) and should be treated as operational data
-- The tool checks for updates via `git fetch` against the public GitHub repository and displays an informational message if a newer version is available — it does **not** auto-update or restart itself. This check can be disabled with `--no-update-check`
+- The tool checks for updates via `git fetch` against the public GitHub repository and displays an informational message if a newer version is available - it does **not** auto-update or restart itself. This check can be disabled with `--no-update-check`
 
 ---
 
@@ -244,10 +244,10 @@ The tool auto-detects which package is installed and adjusts validation accordin
 ### Interpreting Results
 
 - A **PASSED** result means the check matched the expected best-practice configuration
-- A **FAILED** result means a deviation was detected — review the finding and determine if it applies to your environment
+- A **FAILED** result means a deviation was detected - review the finding and determine if it applies to your environment
 - A **SKIPPED** result means a prerequisite was not met (e.g., HANA not installed, resource not running)
 - An **ERROR** result means the check could not be executed (e.g., command failed, data unavailable)
-- Not all FAILED findings necessarily require action — some may be intentional deviations for your specific setup
+- Not all FAILED findings necessarily require action - some may be intentional deviations for your specific setup
 
 ---
 

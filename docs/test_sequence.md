@@ -1,6 +1,6 @@
 # Test Sequence: SAP HANA Pacemaker Cluster Health Check
 
-The tool executes checks in **5 sequential steps**. Within each step, checks are organized into **phases** — checks within the same phase run in **parallel**, while phases execute **sequentially** (because later phases may depend on results from earlier ones).
+The tool executes checks in **5 sequential steps**. Within each step, checks are organized into **phases** - checks within the same phase run in **parallel**, while phases execute **sequentially** (because later phases may depend on results from earlier ones).
 
 ## Step 1: Access Discovery
 
@@ -8,7 +8,7 @@ Discovers and validates access to cluster nodes.
 Methods: local, SSH, Ansible inventory, or SOSreport archives.
 Auto-discovers all cluster members from a single seed node.
 
-No health checks — establishes connectivity for Steps 2–4.
+No health checks - establishes connectivity for Steps 2-4.
 
 ## Step 2: Cluster Configuration
 
@@ -42,7 +42,7 @@ No health checks — establishes connectivity for Steps 2–4.
 
 > **Note:** CHK_MAJORITY_MAKER only runs for Scale-Out clusters.
 
-### Phase 2 (parallel) — gate: hana_resource_running
+### Phase 2 (parallel) - gate: hana_resource_running
 
 Skipped if HANA resource is not running (stopped/disabled/unmanaged).
 
@@ -58,7 +58,7 @@ Skipped if HANA resource is not running (stopped/disabled/unmanaged).
 |----|-------------------------|----------|----------|-----------------------------------------------------------|
 | 16 | CHK_HANA_INSTALLED      | INFO     | per_node | Detect HANA installation, SID, instance, sidadm, status   |
 
-### Phase 2 (parallel) — gate: hana_installed
+### Phase 2 (parallel) - gate: hana_installed
 
 Skipped entirely if no HANA installation was detected in Phase 1.
 
@@ -72,9 +72,9 @@ Skipped entirely if no HANA installation was detected in Phase 1.
 | 22 | CHK_SITE_ROLES          | CRITICAL | cluster  | Verify site roles consistency (one primary, one secondary)|
 
 > **Notes:**
-> - CHK_HANA_SR_STATUS — additional gate: `hana_resource_running`
-> - CHK_HADR_HOOKS — additional gate: `not_legacy_scaleup`; runs on HANA nodes only
-> - CHK_SITE_ROLES — additional gate: `hana_resource_running`
+> - CHK_HANA_SR_STATUS - additional gate: `hana_resource_running`
+> - CHK_HADR_HOOKS - additional gate: `not_legacy_scaleup`; runs on HANA nodes only
+> - CHK_SITE_ROLES - additional gate: `hana_resource_running`
 
 ## Step 5: Health Check Report
 
@@ -85,14 +85,14 @@ Verbose mode (`-v`) includes all checks, not just failures.
 ## Execution Model
 
 - **Steps** execute sequentially (1 → 2 → 3 → 4 → 5)
-- **Phases** within a step execute sequentially (phase 1 → phase 2) — this allows phase 2 to use results from phase 1 (e.g., `CHK_RESOURCE_STATUS` must run before `CHK_PROMOTED_ROLES`)
+- **Phases** within a step execute sequentially (phase 1 → phase 2) - this allows phase 2 to use results from phase 1 (e.g., `CHK_RESOURCE_STATUS` must run before `CHK_PROMOTED_ROLES`)
 - **Checks** within a phase execute in **parallel** (multithreaded) for performance
 - **Gates** control conditional execution: if a gate evaluates to false, all checks behind it are skipped with an explanatory message
 - **Topology filters** skip checks not applicable to the detected cluster type (e.g., `CHK_MAJORITY_MAKER` is skipped for Scale-Up)
 
 ## Read-Only Commands Used
 
-All checks use **read-only** commands — no cluster or SAP configuration is ever modified:
+All checks use **read-only** commands - no cluster or SAP configuration is ever modified:
 
 | Command | Purpose |
 |---------|---------|

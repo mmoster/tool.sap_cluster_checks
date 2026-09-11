@@ -83,7 +83,7 @@ class TestEqOperator:
 
 class TestEqEdgeCases:
     def test_string_vs_int_no_coercion(self):
-        """Engine uses strict comparison — no type coercion between str and int."""
+        """Engine uses strict comparison - no type coercion between str and int."""
         passed, msg, pass_msg = _evaluate(
             {"key": "42"}, {"key": "key", "operator": "eq", "value": 42}
         )

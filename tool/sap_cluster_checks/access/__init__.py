@@ -1,4 +1,4 @@
-"""Access discovery sub-package — node discovery and connectivity."""
+"""Access discovery sub-package - node discovery and connectivity."""
 
 from .models import AccessConfig, NodeAccess
 from .discover_access import AccessDiscovery
