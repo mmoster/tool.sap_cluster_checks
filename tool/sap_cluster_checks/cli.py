@@ -144,14 +144,13 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         hosts_file: str = None,
         workers: int = 10,
         rules_path: str = None,
-        debug: bool = False,
+        verbosity: int = 0,
         ansible_group: str = None,
         skip_ansible: bool = False,
         cluster_name: str = None,
         local_mode: bool = False,
         strict_mode: bool = False,
         generate_pdf: bool = False,
-        verbose_pdf: bool = False,
     ):
         self.config_dir = Path(config_dir) if config_dir else DEFAULT_OUTPUT_DIR
         self.config_dir.mkdir(parents=True, exist_ok=True)
@@ -162,14 +161,15 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         self.access_config = None
         self.rules_engine = None
         self.check_results = []
-        self.debug = debug
+        self.verbosity = verbosity
+        self.debug = verbosity >= 3  # backward compat for _debug_print()
+        self.verbose_pdf = verbosity >= 1  # backward compat for PDF verbose
         self.ansible_group = ansible_group
         self.skip_ansible = skip_ansible
         self.cluster_name = cluster_name
         self.local_mode = local_mode
         self.strict_mode = strict_mode
         self.generate_pdf = generate_pdf
-        self.verbose_pdf = verbose_pdf  # Show all checks in detail in PDF
         self.majority_makers = []  # Nodes that are majority makers (Scale-Out)
         self.last_pdf_file = None  # Track last generated PDF for auto-open
         self._hana_resource_state = "unknown"  # running/stopped/disabled/unmanaged/maintenance/absent
@@ -1262,14 +1262,36 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 node_str = f" ({r.node})" if r.node else ""
                 print(f"    [CRIT] {r.check_id}{node_str}")
                 print(f"           {r.message}")
+                if self.verbosity >= 2 and r.details:
+                    parsed = r.details.get("parsed", {})
+                    for k, v in parsed.items():
+                        print(f"           {k}: {v}")
 
         if warnings:
             print("\n  WARNINGS:")
             for r in warnings[:10]:
                 node_str = f" ({r.node})" if r.node else ""
                 print(f"    [WARN] {r.check_id}{node_str}: {r.message}")
+                if self.verbosity >= 2 and r.details:
+                    parsed = r.details.get("parsed", {})
+                    for k, v in parsed.items():
+                        print(f"           {k}: {v}")
             if len(warnings) > 10:
                 print(f"    ... and {len(warnings) - 10} more warnings")
+
+        if self.verbosity >= 1:
+            passed_results = [
+                r for r in self.check_results if r.status == CheckStatus.PASSED
+            ]
+            if passed_results:
+                print("\n  PASSED CHECKS:")
+                for r in passed_results:
+                    node_str = f" ({r.node})" if r.node and r.node != "all" else ""
+                    print(f"    [OK]   {r.check_id}{node_str}: {r.message}")
+                    if self.verbosity >= 2 and r.details:
+                        parsed = r.details.get("parsed", {})
+                        for k, v in parsed.items():
+                            print(f"           {k}: {v}")
 
         # Build unified report data using single source of truth
         # Use pre-computed summary to avoid recalculating
@@ -2221,12 +2243,12 @@ Examples:
         help="Skip specific steps",
     )
 
-    # Debug option
+    # Debug option (backward compatibility alias for -vvv)
     parser.add_argument(
         "--debug",
         "-d",
         action="store_true",
-        help="Enable debug mode (show config files used and step progress)",
+        help="Enable debug mode (equivalent to -vvv)",
     )
 
     # Strict mode option
@@ -2250,12 +2272,13 @@ Examples:
         help="Skip PDF report generation (useful if fpdf2 is not installed)",
     )
 
-    # Verbose PDF option to show all checks in detail
+    # Verbosity levels: -v (passed checks + verbose PDF), -vv (+ parsed values), -vvv (+ debug)
     parser.add_argument(
         "--verbose",
         "-v",
-        action="store_true",
-        help="Verbose PDF report - show all checks in detail (not just failed/warnings)",
+        action="count",
+        default=0,
+        help="Increase verbosity (-v: show passed checks, -vv: + parsed values, -vvv: + debug)",
     )
 
     # No-update-check option
@@ -2701,7 +2724,9 @@ Examples:
     # Create health check instance
     # PDF generation is enabled by default, can be disabled with --no-pdf
     generate_pdf = not args.no_pdf
-    verbose_pdf = args.verbose  # Show all checks in detail in PDF
+    verbosity = args.verbose or 0
+    if args.debug:
+        verbosity = max(verbosity, 3)
 
     # Check upfront if PDF dependencies are available - inform user of missing packages
     if generate_pdf:
@@ -2751,13 +2776,12 @@ Examples:
         hosts_file=hosts_file,
         workers=args.workers,
         rules_path=args.rules_path,
-        debug=args.debug,
+        verbosity=verbosity,
         ansible_group=args.group,
         cluster_name=args.cluster,
         local_mode=local_mode,
         strict_mode=args.strict,
         generate_pdf=generate_pdf,
-        verbose_pdf=verbose_pdf,
     )
 
     def cleanup_temp_file():
@@ -2891,13 +2915,12 @@ Examples:
                                     hosts_file=tmp_hosts_path,
                                     workers=args.workers,
                                     rules_path=args.rules_path,
-                                    debug=args.debug,
+                                    verbosity=verbosity,
                                     ansible_group=args.group,
                                     cluster_name=None,  # Force rediscovery
                                     local_mode=False,
                                     strict_mode=args.strict,
                                     generate_pdf=not args.no_pdf,
-                                    verbose_pdf=verbose_pdf,
                                 )
                                 # Run health check with force rediscovery
                                 exit_code = new_health_check.run_all_checks(
@@ -2967,7 +2990,7 @@ Examples:
                             report_data.to_cluster_info(),
                             str(pdf_file),
                             report_data.get_install_status() or None,
-                            verbose=verbose_pdf,
+                            verbose=verbosity >= 1,
                         )
                         print(f"\n  PDF report saved: {pdf_file}")
                         print("  Goodbye!")
@@ -3070,7 +3093,7 @@ Examples:
                                 report_data.to_cluster_info(),
                                 str(pdf_file),
                                 report_data.get_install_status() or None,
-                                verbose=verbose_pdf,
+                                verbose=verbosity >= 1,
                             )
                             print(f"\n  PDF report saved: {pdf_file}")
 
