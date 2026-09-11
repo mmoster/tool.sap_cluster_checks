@@ -632,10 +632,11 @@ class SOSReportDiscoveryMixin:
                     if op_match:
                         config["operation_mode"] = op_match.group(1)
 
-                    # Extract sites
+                    # Extract sites (filter out numeric site IDs like "100")
                     site_matches = re.findall(r"site\s*[=:]\s*(\w+)", content, re.IGNORECASE)
-                    if site_matches:
-                        config["sites"] = list(set(site_matches))
+                    site_names = [s for s in set(site_matches) if not s.isdigit()]
+                    if site_names:
+                        config["sites"] = site_names
 
                     break  # Found SR attr, stop looking
                 except Exception:
