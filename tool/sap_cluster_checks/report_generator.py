@@ -1433,8 +1433,45 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         )
         priority += 1
 
+    all_failed = failed_checks + warning_checks
+    if any(
+        c.get("check_id") in ["CHK_PROMOTED_ROLES", "CHK_SITE_ROLES"] for c in all_failed
+    ):
+        pdf.recommendation_box(
+            str(priority),
+            "HA Degraded \u2014 No Failover Target",
+            "The cluster has no secondary/unpromoted HANA instance. "
+            "Automatic failover is not possible. Check if a node is in standby "
+            "or if System Replication is broken.",
+            [
+                "# Check node status\npcs status nodes",
+                "# Bring standby node back online\npcs node unstandby <node>",
+            ],
+        )
+        priority += 1
+
+    if any(c.get("check_id") == "CHK_NODE_STATUS" for c in all_failed):
+        pdf.recommendation_box(
+            str(priority),
+            "Cluster Node Offline or in Standby",
+            "One or more cluster nodes are not online, reducing cluster redundancy.",
+            [
+                "# Check node status\npcs status nodes",
+                "# Bring standby node back online\npcs node unstandby <node>",
+            ],
+        )
+        priority += 1
+
     if priority == 1:  # No specific recommendations
-        pdf.body_text("No critical issues found. The cluster appears to be properly configured.")
+        if warning_checks:
+            pdf.body_text(
+                "No critical configuration issues found. "
+                "Review warnings above for potential improvements."
+            )
+        else:
+            pdf.body_text(
+                "No critical issues found. The cluster appears to be properly configured."
+            )
         pdf.ln(5)
 
     # =========================================================================
