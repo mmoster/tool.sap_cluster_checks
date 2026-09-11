@@ -1456,8 +1456,13 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             "Automatic failover is not possible. Check if a node is in standby "
             "or if System Replication is broken.",
             [
-                "# Check node status\npcs status nodes",
-                "# Bring standby node back online\npcs node unstandby <node>",
+                "# Diagnose: check node and replication status\n"
+                "pcs status nodes\n"
+                "SAPHanaSR-showAttr",
+                "# Remediate (if node is in standby):\n"
+                "# pcs node unstandby <node>",
+                "# After remediation, re-check:\n"
+                "# ./sap_cluster_checks.py -D",
             ],
         )
         priority += 1
@@ -1468,8 +1473,11 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             "Cluster Node Offline or in Standby",
             "One or more cluster nodes are not online, reducing cluster redundancy.",
             [
-                "# Check node status\npcs status nodes",
-                "# Bring standby node back online\npcs node unstandby <node>",
+                "# Diagnose: check node status\npcs status nodes",
+                "# Remediate (if node is in standby):\n"
+                "# pcs node unstandby <node>",
+                "# After remediation, re-check:\n"
+                "# ./sap_cluster_checks.py -D",
             ],
         )
         priority += 1
