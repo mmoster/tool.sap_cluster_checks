@@ -94,7 +94,7 @@ class ClusterReportData:
     node1_ip: str = None
     node2_hostname: str = None
     node2_ip: str = None
-    sites: Dict[str, Any] = None
+    sites: List[str] = None
 
     # =========================================================================
     # HA PARAMETERS
@@ -140,7 +140,7 @@ class ClusterReportData:
         if self.majority_makers is None:
             self.majority_makers = []
         if self.sites is None:
-            self.sites = {}
+            self.sites = []
         if self.stonith_params is None:
             self.stonith_params = {}
         if self.resource_config is None:

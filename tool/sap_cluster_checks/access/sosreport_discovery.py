@@ -607,10 +607,14 @@ class SOSReportDiscoveryMixin:
                 except Exception:
                     pass
 
-        # Parse SAPHanaSR-showAttr for replication info
+        # Parse SAPHanaSR-showAttr for replication info (ANGI / Scale-Out only)
         sr_attr_paths = [
             sos_path / "sos_commands/sos_extras/sap_hana_ha/SAPHanaSR-showAttr",
             sos_path / "sos_commands/saphana/SAPHanaSR-showAttr",
+        ]
+        sr_script_paths = [
+            sos_path / "sos_commands/sos_extras/sap_hana_ha/SAPHanaSR-showAttr_--format_script",
+            sos_path / "sos_commands/saphana/SAPHanaSR-showAttr_--format_script",
         ]
 
         for sr_attr_path in sr_attr_paths:
@@ -632,15 +636,57 @@ class SOSReportDiscoveryMixin:
                     if op_match:
                         config["operation_mode"] = op_match.group(1)
 
-                    # Extract sites (filter out numeric site IDs like "100")
-                    site_matches = re.findall(r"site\s*[=:]\s*(\w+)", content, re.IGNORECASE)
-                    site_names = [s for s in set(site_matches) if not s.isdigit()]
-                    if site_names:
-                        config["sites"] = site_names
-
                     break  # Found SR attr, stop looking
                 except Exception:
                     pass
+
+        # Extract site names from SAPHanaSR-showAttr --format script
+        # Format: "0 Host/<hostname>/site="<SITE_NAME>""
+        if not config.get("sites"):
+            for sr_script_path in sr_script_paths:
+                if sr_script_path.exists():
+                    try:
+                        content = sr_script_path.read_text()
+                        site_matches = re.findall(
+                            r'Host/\S+/site="(\w+)"', content
+                        )
+                        site_names = [
+                            s for s in dict.fromkeys(site_matches)
+                            if not s.isdigit()
+                        ]
+                        if site_names:
+                            config["sites"] = site_names
+                        break
+                    except Exception:
+                        pass
+
+        # Fallback: extract sites from CIB node attributes (hana_<sid>_site)
+        # Works for both legacy and ANGI clusters
+        if not config.get("sites"):
+            cib_paths = sorted(
+                sos_path.glob("sos_commands/pacemaker/crm_report/*/cib.xml")
+            )
+            for cib_path in cib_paths[:1]:
+                try:
+                    content = cib_path.read_text()
+                    site_matches = re.findall(
+                        r'name="hana_\w+_site"\s+value="(\w+)"', content
+                    )
+                    site_names = [
+                        s for s in dict.fromkeys(site_matches)
+                        if not s.isdigit()
+                    ]
+                    if site_names:
+                        config["sites"] = site_names
+                except Exception:
+                    pass
+
+        # Set site1_name/site2_name from sites list
+        sites = config.get("sites", [])
+        if len(sites) >= 1 and not config.get("site1_name"):
+            config["site1_name"] = sites[0]
+        if len(sites) >= 2 and not config.get("site2_name"):
+            config["site2_name"] = sites[1]
 
         # Extract node info from corosync.conf
         corosync_conf = sos_path / "etc/corosync/corosync.conf"

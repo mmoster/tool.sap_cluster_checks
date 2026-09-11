@@ -879,12 +879,15 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         site1 = cluster_info.get("site1_name", "")
         site2 = cluster_info.get("site2_name", "")
         sites = cluster_info.get("sites", [])
+        # Normalize: old reports may have sites as dict instead of list
+        if isinstance(sites, dict):
+            sites = list(sites.values()) if sites else []
         if site1:
             hana_config["Site 1 Name"] = site1
         if site2:
             hana_config["Site 2 Name"] = site2
         elif sites and not site1:
-            hana_config["Sites"] = ", ".join(sites)
+            hana_config["Sites"] = ", ".join(str(s) for s in sites)
         if hana_config:
             pdf.info_table(hana_config)
         pdf.ln(3)

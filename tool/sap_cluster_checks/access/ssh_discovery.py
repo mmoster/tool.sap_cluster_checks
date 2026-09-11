@@ -449,7 +449,8 @@ class SSHDiscoveryMixin:
                     # If it contains 'value=', extract just the value
                     if "value=" in s:
                         s = s.split("value=")[-1].strip()
-                    if s and len(s) <= 20:  # Reasonable site name length
+                    # Filter out numeric site IDs (e.g. "100") — keep names like "DC1"
+                    if s and len(s) <= 20 and not s.isdigit():
                         sites.append(s)
             sites = list(dict.fromkeys(sites))  # Remove duplicates while preserving order
             if sites:
