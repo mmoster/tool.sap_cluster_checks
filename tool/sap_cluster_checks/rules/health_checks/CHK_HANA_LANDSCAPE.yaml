@@ -18,7 +18,7 @@
 #
 check_id: CHK_HANA_LANDSCAPE
 version: "1.0"
-severity: INFO
+severity: WARNING
 optional: true
 description: SAP HANA landscape topology (Scale-Up vs Scale-Out)
 enabled: true
@@ -92,8 +92,14 @@ parser:
 
 validation_logic:
   scope: node
-  match_mode: any
+  match_mode: all
   expectations:
+    - key: overall_status
+      operator: in_if_exists
+      value: ["ok"]
+      severity: WARNING
+      message: "HANA landscape overall status: ${overall_status}"
+      pass_message: "HANA landscape status: ok"
     - key: hana_topology
       operator: info_if_exists
       pass_message: "HANA topology: ${hana_topology} (${hana_host_count} hosts, status: ${overall_status})"

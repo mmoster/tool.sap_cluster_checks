@@ -1370,6 +1370,13 @@ class RulesEngine:
                 return True, message, pass_message
             return True, message, None
 
+        # in_if_exists: like 'in', but silently passes when key is absent
+        if operator == "in_if_exists":
+            if actual is None:
+                return True, message, None
+            passed = actual in expected if isinstance(expected, list) else actual == expected
+            return passed, message, pass_message if passed else None
+
         if operator == "exists":
             # 'exists' checks if the key has a non-None value
             # If value is specified as False, check that key does NOT exist

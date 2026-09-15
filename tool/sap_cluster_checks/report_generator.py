@@ -155,7 +155,6 @@ class HealthCheckPDF(FPDF):
             "CRITICAL": PdfColors.RED,
             "CRITICAL - INCOMPLETE": PdfColors.RED,
             "FAILED - INCOMPLETE": PdfColors.ORANGE,
-            "INCOMPLETE": PdfColors.ORANGE,
             "NEEDS ATTENTION": PdfColors.YELLOW,
             "HEALTHY": PdfColors.GREEN,
         }
@@ -443,7 +442,6 @@ def _render_executive_summary(pdf, summary, cluster_info, install_status, cluste
         "FAILED - INCOMPLETE": "Failed checks and installation incomplete",
         "CRITICAL": "Critical issues found, installation complete",
         "NEEDS ATTENTION": "Failed checks found, installation complete",
-        "INCOMPLETE": "No failures, but installation incomplete",
         "WARNING": "Warnings only, no critical issues",
         "HEALTHY": "All checks passed, cluster fully configured",
     }
@@ -456,8 +454,6 @@ def _render_executive_summary(pdf, summary, cluster_info, install_status, cluste
         overall_status = "FAILED - INCOMPLETE"
     elif failed > 0:
         overall_status = "NEEDS ATTENTION"
-    elif not install_complete:
-        overall_status = "INCOMPLETE"
     elif resources_not_managed:
         overall_status = "WARNING"
         status_descriptions["WARNING"] = (
