@@ -1627,6 +1627,18 @@ class RulesEngine:
             custom_check = rule.validation_logic.get("custom_check")
             if custom_check and method == "sosreport":
                 output = ""
+            elif method == "sosreport" and (
+                "File not found" in output or "No files matching" in output
+            ):
+                # Missing file in sosreport = data not collected, not an error
+                return CheckResult(
+                    check_id=rule.check_id,
+                    description=rule.description,
+                    status=CheckStatus.SKIPPED,
+                    severity=Severity.INFO,
+                    message=f"Data not available in SOSreport",
+                    node=node,
+                )
             else:
                 return CheckResult(
                     check_id=rule.check_id,
