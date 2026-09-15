@@ -285,3 +285,35 @@ class TestHanaLandscape:
         result = _parse(error_landscape, self.PARSER)
         assert result["host_status"] == "error"
         assert result["overall_status"] == "error"
+
+    # ── Validation-level tests (in_if_exists on overall_status) ──
+
+    STATUS_EXPECTATION = {
+        "key": "overall_status",
+        "operator": "in_if_exists",
+        "value": ["ok"],
+        "severity": "WARNING",
+        "message": "HANA landscape overall status: ${overall_status}",
+        "pass_message": "HANA landscape status: ok",
+    }
+
+    def test_validation_ok_status_passes(self):
+        engine = RulesEngine()
+        parsed = _parse(LANDSCAPE_SCALE_UP, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.STATUS_EXPECTATION)
+        assert passed is True
+
+    def test_validation_error_status_fails(self):
+        engine = RulesEngine()
+        error_landscape = LANDSCAPE_SCALE_UP.replace("| ok     |", "| error  |").replace("overall host status: ok", "overall host status: error")
+        parsed = _parse(error_landscape, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.STATUS_EXPECTATION)
+        assert passed is False
+        assert pass_msg is None
+
+    def test_validation_non_hana_node_passes(self):
+        engine = RulesEngine()
+        parsed = _parse("NOT_HANA_NODE", self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.STATUS_EXPECTATION)
+        assert passed is True
+        assert pass_msg is None

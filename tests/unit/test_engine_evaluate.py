@@ -287,6 +287,44 @@ class TestInfoIfExistsOperator:
         assert pass_msg is None
 
 
+class TestInIfExistsOperator:
+    def test_value_in_list_passes(self):
+        passed, msg, pass_msg = _evaluate(
+            {"status": "ok"},
+            {"key": "status", "operator": "in_if_exists", "value": ["ok"]},
+        )
+        assert passed is True
+
+    def test_value_not_in_list_fails(self):
+        passed, msg, pass_msg = _evaluate(
+            {"status": "error"},
+            {"key": "status", "operator": "in_if_exists", "value": ["ok"]},
+        )
+        assert passed is False
+
+    def test_key_absent_passes_silently(self):
+        passed, msg, pass_msg = _evaluate(
+            {},
+            {"key": "status", "operator": "in_if_exists", "value": ["ok"], "pass_message": "ok"},
+        )
+        assert passed is True
+        assert pass_msg is None
+
+    def test_key_none_passes_silently(self):
+        passed, msg, pass_msg = _evaluate(
+            {"status": None},
+            {"key": "status", "operator": "in_if_exists", "value": ["ok"]},
+        )
+        assert passed is True
+
+    def test_single_value_fallback(self):
+        passed, msg, pass_msg = _evaluate(
+            {"status": "ok"},
+            {"key": "status", "operator": "in_if_exists", "value": "ok"},
+        )
+        assert passed is True
+
+
 class TestTemplateVariableSubstitution:
     def test_single_variable(self):
         parsed = {"name": "hello", "version": "1.0"}
