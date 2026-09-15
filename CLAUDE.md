@@ -17,3 +17,4 @@
 - User communicates in German, commit messages in English
 - Commit messages: do NOT add Co-Authored-By lines
 - Use standard hyphens (`-`) in markdown and text. Never use em-dashes or en-dashes.
+- Always add new tests when adding or changing functionality (engine operators, validation logic, etc.)
