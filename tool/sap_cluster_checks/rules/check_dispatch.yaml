@@ -21,10 +21,6 @@
 #
 version: "1.0"
 
-topologies:
-  - Scale-Up
-  - Scale-Out
-
 steps:
   config:
     name: "Cluster Configuration"

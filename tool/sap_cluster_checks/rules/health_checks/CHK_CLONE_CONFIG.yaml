@@ -66,28 +66,3 @@ parser:
 validation_logic:
   scope: cluster  # Clone config is cluster-wide
   custom_check: clone_max_validation
-  expectations:
-    - key: saphana_resource
-      operator: exists
-      value: true
-      message: "No SAPHana clone/promotable resource found"
-    - key: controller_clone_node_max
-      operator: equals
-      value: "1"
-      message: "SAPHanaController clone-node-max should be 1"
-    - key: controller_interleave
-      operator: equals
-      value: "true"
-      message: "SAPHanaController interleave should be true"
-    - key: controller_promotable
-      operator: equals
-      value: "true"
-      message: "SAPHanaController should be promotable (promoted/unpromoted)"
-    - key: topology_clone_node_max
-      operator: equals
-      value: "1"
-      message: "SAPHanaTopology clone-node-max should be 1"
-    - key: topology_interleave
-      operator: equals
-      value: "true"
-      message: "SAPHanaTopology interleave should be true"

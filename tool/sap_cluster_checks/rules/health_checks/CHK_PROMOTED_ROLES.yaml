@@ -4,7 +4,6 @@ version: "1.1"
 severity: CRITICAL
 description: Verify exactly one promoted and one unpromoted instance in HANA cluster
 enabled: true
-requires: CHK_RESOURCE_STATUS  # Skip if HANA resource is not running
 
 source_definitions:
   live_cmd: "crm_mon -1 2>/dev/null | grep -E 'Master|Slave|Promoted|Unpromoted' || SAPHanaSR-showAttr 2>/dev/null | grep -E 'roles|master'"

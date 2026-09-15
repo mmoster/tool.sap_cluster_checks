@@ -37,6 +37,7 @@ from .lib import (
     print_suggestions,
     interactive_startup,
     run_usage_scan,
+    check_for_updates,
     ClusterReportData,
     REPORT_VERSION,
 )
@@ -714,12 +715,6 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         self.rules_engine.results.extend(all_results)
 
         return all_results
-
-    def _filter_rules_by_prefix(self, prefixes: list) -> list:
-        """Filter loaded rules by check_id prefix."""
-        return [
-            r for r in self.rules_engine.rules if any(r.check_id.startswith(p) for p in prefixes)
-        ]
 
     # ------------------------------------------------------------------
     # Dispatch-driven step execution
@@ -2345,13 +2340,6 @@ Examples:
         help="Strict mode: all checks required (fencing, alerts). Default: optional checks are warnings only",
     )
 
-    # PDF report option (now default, kept for backwards compatibility)
-    parser.add_argument(
-        "--pdf",
-        action="store_true",
-        help="Generate PDF report (default: enabled, this flag is kept for compatibility)",
-    )
-
     # No-PDF option to skip PDF generation
     parser.add_argument(
         "--no-pdf",
@@ -2427,80 +2415,9 @@ Examples:
 
     args = parser.parse_args()
 
-    # Check for software updates
-    def check_for_updates():
-        """Check if a newer version is available via git and offer to update."""
-        try:
-            import subprocess
-
-            # Check if we're in a git repository
-            result = subprocess.run(
-                ["git", "rev-parse", "--git-dir"],
-                cwd=SCRIPT_DIR,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            if result.returncode != 0:
-                return  # Not a git repo
-
-            # Fetch latest from remote (quietly)
-            subprocess.run(
-                ["git", "fetch", "--quiet"],
-                cwd=SCRIPT_DIR,
-                capture_output=True,
-                timeout=30,
-                check=False,
-            )
-
-            # Get local and remote HEAD
-            local_head = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=SCRIPT_DIR,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            ).stdout.strip()
-
-            remote_head = subprocess.run(
-                ["git", "rev-parse", "@{u}"],
-                cwd=SCRIPT_DIR,
-                capture_output=True,
-                text=True,
-                timeout=5,
-                check=False,
-            ).stdout.strip()
-
-            if local_head != remote_head:
-                # Check how many commits behind (remote has that we don't)
-                behind_count = subprocess.run(
-                    ["git", "rev-list", "--count", f"{local_head}..{remote_head}"],
-                    cwd=SCRIPT_DIR,
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                    check=False,
-                ).stdout.strip()
-
-                # Only show update prompt if actually behind (not if ahead with local commits)
-                try:
-                    behind_int = int(behind_count)
-                except ValueError:
-                    behind_int = 0
-
-                if behind_int > 0:
-                    print(
-                        f"\n[INFO] A newer version is available ({behind_count} commit(s) behind)."
-                    )
-                    print("  To update, run: git pull")
-        except Exception:
-            pass  # Silently ignore any errors in update check
-
     # Check for updates (skip only if explicitly disabled with --no-update-check)
     if sys.stdin.isatty() and not args.no_update_check:
-        check_for_updates()
+        check_for_updates(SCRIPT_DIR)
 
     # Handle usage/scan action (-u)
     if args.usage:

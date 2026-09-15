@@ -60,7 +60,6 @@ class RuleDefinition:
     """Parsed rule definition from YAML."""
 
     check_id: str = None
-    version: str = None
     severity: str = None
     description: str = None
     enabled: bool = True
@@ -70,7 +69,6 @@ class RuleDefinition:
     parser: Dict[str, Any] = None
     validation_logic: Dict[str, Any] = None
     topology_filter: Any = None  # str, list of str, or None (all topologies)
-    requires: Optional[str] = None  # Check ID that must pass before this one runs
     raw_yaml: Dict[str, Any] = None
 
     def __post_init__(self):
@@ -138,7 +136,6 @@ class CheckDispatch:
     def __init__(self, manifest_path: str = None):
         self._manifest_path = manifest_path or self.DEFAULT_MANIFEST
         self._steps: Dict[str, DispatchStep] = {}
-        self._topologies: List[str] = []
         self._loaded = False
 
     @property
@@ -159,8 +156,6 @@ class CheckDispatch:
 
         if not data or not isinstance(data, dict):
             return False
-
-        self._topologies = data.get("topologies", [])
 
         for step_name, step_data in data.get("steps", {}).items():
             phases = []
@@ -425,7 +420,6 @@ class RulesEngine:
 
                 rule = RuleDefinition(
                     check_id=data.get("check_id", rule_file.stem),
-                    version=data.get("version", "1.0"),
                     severity=data.get("severity", "WARNING"),
                     description=data.get("description", ""),
                     enabled=data.get("enabled", True),
@@ -435,7 +429,6 @@ class RulesEngine:
                     parser=data.get("parser", {}),
                     validation_logic=data.get("validation_logic", {}),
                     topology_filter=data.get("topology_filter"),
-                    requires=data.get("requires"),
                     raw_yaml=data,
                 )
                 self.rules.append(rule)
@@ -1011,7 +1004,6 @@ class RulesEngine:
                 validate_rhel_arch_compatibility,
                 HadrValidator,
             )
-            from ..lib.hadr_provider.suggestions import format_finding_message
         except ImportError:
             return CheckResult(
                 check_id=rule.check_id,
@@ -1112,7 +1104,7 @@ class RulesEngine:
             "CRITICAL" if critical_findings else ("WARNING" if warning_findings else "INFO")
         )
 
-        messages = [format_finding_message(f) for f in findings if f.severity != "INFO"]
+        messages = [f"[{f.severity}] {f.what_is_wrong}" for f in findings if f.severity != "INFO"]
         summary = "\n           ".join(messages)
         if len(messages) > 5:
             summary = "\n           ".join(messages[:5])
@@ -1381,26 +1373,11 @@ class RulesEngine:
                 passed = actual is not None
         elif operator == "not_exists":
             passed = actual is None
-        elif operator == "eq":
-            passed = actual == expected
-        elif operator == "ne":
-            passed = actual != expected
         elif operator == "in":
             passed = actual in expected if isinstance(expected, list) else actual == expected
-        elif operator == "not_in":
-            passed = actual not in expected if isinstance(expected, list) else actual != expected
-        elif operator == "contains":
-            passed = expected in str(actual) if actual else False
-        elif operator == "regex":
-            passed = bool(re.search(expected, str(actual))) if actual else False
         elif operator == "gt":
             try:
                 passed = float(actual) > float(expected)
-            except (TypeError, ValueError):
-                passed = False
-        elif operator == "lt":
-            try:
-                passed = float(actual) < float(expected)
             except (TypeError, ValueError):
                 passed = False
         else:
@@ -1699,26 +1676,6 @@ class RulesEngine:
         - cluster: Run only on one node (cluster-wide info)
         """
         results = []
-
-        # Check requires dependency - skip if required check did not pass
-        # NOTE: This only works when results are accumulated in self.results
-        # (i.e., via run_all_checks). The orchestrator handles gating separately
-        # for the parallel execution path via _run_rules_parallel.
-        if rule.requires:
-            required_passed = any(
-                r.check_id == rule.requires and r.status == CheckStatus.PASSED for r in self.results
-            )
-            if not required_passed:
-                return [
-                    CheckResult(
-                        check_id=rule.check_id,
-                        description=rule.description,
-                        status=CheckStatus.SKIPPED,
-                        severity=Severity.WARNING,
-                        message=f"Skipped: required check {rule.requires} did not pass",
-                        node=None,
-                    )
-                ]
 
         # Check topology_filter - skip if rule specifies a topology that
         # doesn't match the detected topology (engine-level safety net)
@@ -2029,81 +1986,3 @@ class RulesEngine:
 
         return results
 
-    def run_all_checks(self, nodes: Dict[str, dict]) -> List[CheckResult]:
-        """Run all loaded checks on all nodes."""
-        self.results = []
-
-        if not self.rules:
-            self.load_rules()
-
-        print(f"\nRunning {len(self.rules)} checks on {len(nodes)} node(s)...")
-
-        for rule in self.rules:
-            print(f"\n  [{rule.severity}] {rule.check_id}: {rule.description}")
-            check_results = self.run_check(rule, nodes)
-
-            for result in check_results:
-                self.results.append(result)
-                status_icon = {
-                    CheckStatus.PASSED: "✓",
-                    CheckStatus.FAILED: "✗",
-                    CheckStatus.SKIPPED: "○",
-                    CheckStatus.ERROR: "!",
-                }.get(result.status, "?")
-                node_str = f" ({result.node})" if result.node else ""
-                print(f"    {status_icon} {result.status.value}{node_str}: {result.message}")
-
-        return self.results
-
-    def get_summary(self) -> Dict[str, Any]:
-        """Get summary of all check results."""
-        summary = {
-            "total": len(self.results),
-            "passed": 0,
-            "failed": 0,
-            "skipped": 0,
-            "errors": 0,
-            "critical_failures": [],
-            "warnings": [],
-        }
-
-        for result in self.results:
-            if result.status == CheckStatus.PASSED:
-                summary["passed"] += 1
-            elif result.status == CheckStatus.FAILED:
-                summary["failed"] += 1
-                if result.severity == Severity.CRITICAL:
-                    summary["critical_failures"].append(result)
-                else:
-                    summary["warnings"].append(result)
-            elif result.status == CheckStatus.SKIPPED:
-                summary["skipped"] += 1
-            elif result.status == CheckStatus.ERROR:
-                summary["errors"] += 1
-
-        return summary
-
-    def print_summary(self):
-        """Print formatted summary of results."""
-        summary = self.get_summary()
-
-        print("\n" + "=" * 63)
-        print(" Health Check Results Summary")
-        print("=" * 63)
-        print(f"  Total checks:  {summary['total']}")
-        print(f"  Passed:        {summary['passed']}")
-        print(f"  Failed:        {summary['failed']}")
-        print(f"  Skipped:       {summary['skipped']}")
-        print(f"  Errors:        {summary['errors']}")
-
-        if summary["critical_failures"]:
-            print("\n  CRITICAL FAILURES:")
-            for r in summary["critical_failures"]:
-                print(f"    - [{r.check_id}] {r.message}")
-
-        if summary["warnings"]:
-            print("\n  WARNINGS:")
-            for r in summary["warnings"][:5]:  # Show first 5
-                print(f"    - [{r.check_id}] {r.message}")
-            if len(summary["warnings"]) > 5:
-                print(f"    ... and {len(summary['warnings']) - 5} more")

@@ -36,7 +36,7 @@ from .cluster_report import (
     REPORT_VERSION,
 )
 
-from .install_checks import CommandExecutor, make_status_dict
+from .install_checks import make_status_dict
 from .install_status import InstallStatusMixin
 from .install_guide import InstallGuideMixin
 from .hana_status import HanaStatusMixin
@@ -62,7 +62,6 @@ __all__ = [
     "ClusterReportData",
     "REPORT_VERSION",
     # install_checks
-    "CommandExecutor",
     "make_status_dict",
     # install_status
     "InstallStatusMixin",

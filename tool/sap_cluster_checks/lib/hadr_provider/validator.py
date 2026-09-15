@@ -75,7 +75,7 @@ class HadrValidator:
 
             if section is None:
                 severity = "WARNING" if hook.is_optional else "CRITICAL"
-                desc, cmd = generate_fix_for_missing_section(hook, actual.sid, expected.arch_type)
+                desc, cmd = generate_fix_for_missing_section(hook, actual.sid)
                 findings.append(
                     Finding(
                         category="global_ini",
@@ -265,7 +265,7 @@ class HadrValidator:
                 elif "hookhelper" in entry.description.lower() and not uses_fence:
                     continue
                 severity = "WARNING" if is_optional else "CRITICAL"
-                desc, cmd = generate_fix_for_missing_sudoers(entry, actual.sid)
+                desc, cmd = generate_fix_for_missing_sudoers(entry)
                 findings.append(
                     Finding(
                         category="sudoers",

@@ -1116,9 +1116,7 @@ class SSHDiscoveryMixin:
                 print(f"    [DEBUG] Failed to get machine-id from SOSreport: {e}")
         return None
 
-    def check_ansible_access(
-        self, hostname: str, _ansible_host: str = None, _ansible_user: str = None
-    ) -> bool:
+    def check_ansible_access(self, hostname: str) -> bool:
         """Check Ansible access to a host using ansible ping."""
         try:
             cmd = ["ansible", hostname, "-m", "ping", "-o"]
@@ -1159,9 +1157,7 @@ class SSHDiscoveryMixin:
             node.ansible_host = ansible_info.get("ansible_host")
             node.ansible_user = ansible_info.get("ansible_user")
             if not node.ssh_reachable:  # Only check Ansible if SSH failed
-                node.ansible_reachable = self.check_ansible_access(
-                    hostname, node.ansible_host, node.ansible_user
-                )
+                node.ansible_reachable = self.check_ansible_access(hostname)
                 # Get machine ID via Ansible if SSH failed
                 if node.ansible_reachable:
                     node.machine_id = self.get_machine_id_ansible(hostname)

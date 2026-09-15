@@ -6,7 +6,7 @@ a shell command or configuration text the operator can apply directly.
 
 from typing import Tuple
 
-from .models import ArchType, HookConfig, SudoersEntry
+from .models import HookConfig, SudoersEntry
 
 # ---------------------------------------------------------------------------
 # global.ini fixes
@@ -16,7 +16,6 @@ from .models import ArchType, HookConfig, SudoersEntry
 def generate_fix_for_missing_section(
     hook: HookConfig,
     sid: str,
-    _arch_type: ArchType,
 ) -> Tuple[str, str]:
     """Fix for a missing [ha_dr_provider_*] section in global.ini."""
     sid_upper = sid.upper()
@@ -71,7 +70,6 @@ def generate_fix_for_wrong_value(
 
 def generate_fix_for_missing_sudoers(
     entry: SudoersEntry,
-    _sid: str,
 ) -> Tuple[str, str]:
     """Fix for a missing sudoers entry."""
     desc = f"Add sudoers entry: {entry.description}"
@@ -232,6 +230,3 @@ def generate_migration_hint() -> Tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
-def format_finding_message(finding) -> str:
-    """Format a Finding into a concise one-line message for CheckResult.message."""
-    return f"[{finding.severity}] {finding.what_is_wrong}"

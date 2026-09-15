@@ -6,7 +6,7 @@ On Python 3.6 it provides minimal fallbacks sufficient for this project.
 """
 
 try:
-    from dataclasses import dataclass, field, asdict  # noqa: F401
+    from dataclasses import dataclass, asdict  # noqa: F401
 except ImportError:
     # Fallback for Python < 3.7
     def field(default=None, default_factory=None):

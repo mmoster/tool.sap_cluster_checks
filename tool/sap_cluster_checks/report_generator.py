@@ -57,25 +57,6 @@ class RedHatColors:
     BLUE = (0, 102, 204)  # Link blue
 
 
-class NeutralColors:
-    """Corporate-neutral blue/gray palette (non-branded alternative)"""
-
-    RED = (0, 90, 156)  # Primary blue (replaces red accents)
-    DARK_RED = (0, 62, 110)  # Darker blue for headers
-    BLACK = (33, 37, 41)  # Near black
-    GRAY = (108, 117, 125)  # Medium gray
-    LIGHT_GRAY = (241, 243, 245)  # Background gray
-    WHITE = (255, 255, 255)
-    GREEN = (40, 167, 69)  # Success green
-    YELLOW = (255, 193, 7)  # Warning yellow
-    ORANGE = (253, 126, 20)  # Incomplete/in-progress orange
-    BLUE = (0, 123, 255)  # Link blue
-
-
-# --- Color scheme selection ---
-# Change this alias to switch the PDF report color scheme.
-# Default: RedHatColors (Red Hat brand colors)
-# Alternative: NeutralColors (corporate-neutral blue/gray palette)
 PdfColors = RedHatColors
 
 
@@ -174,7 +155,6 @@ class HealthCheckPDF(FPDF):
             "WARNING": PdfColors.YELLOW,
             "SKIPPED": PdfColors.GRAY,
             "ERROR": PdfColors.RED,
-            "OK": PdfColors.GREEN,
             "CRITICAL": PdfColors.RED,
             "CRITICAL - INCOMPLETE": PdfColors.RED,
             "FAILED - INCOMPLETE": PdfColors.ORANGE,
@@ -1586,19 +1566,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     pdf.output(output_path)
     return output_path
-
-
-def load_yaml_report(yaml_path: str) -> tuple:
-    """Load results from YAML report file (legacy format)"""
-    import yaml
-
-    with open(yaml_path, "r", encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-
-    results = data.get("results", [])  # pylint: disable=redefined-outer-name
-    summary = data.get("summary", {})  # pylint: disable=redefined-outer-name
-
-    return results, summary
 
 
 def load_unified_yaml_report(yaml_path: str) -> tuple:
