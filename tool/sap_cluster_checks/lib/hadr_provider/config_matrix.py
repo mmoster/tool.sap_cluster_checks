@@ -72,7 +72,7 @@ def _angi_sudoers(sid: str) -> List[SudoersEntry]:
             #   rh1adm ALL=(ALL) NOPASSWD: ..., /usr/sbin/crm_attribute -n hana_rh1_*
             #   (ALL) NOPASSWD: /usr/sbin/crm_attribute -n hana_rh1_site_srHook_* (SAP HA role)
             #   Cmnd_Alias ... crm_attribute ... hana_
-            line_pattern=rf"(NOPASSWD:.*(/usr/sbin/)?crm_attribute\s+-n\s+hana_|Cmnd_Alias.*crm_attribute.*hana_)",
+            line_pattern=r"(NOPASSWD:.*(/usr/sbin/)?crm_attribute\s+-n\s+hana_|Cmnd_Alias.*crm_attribute.*hana_)",
             description="Allow crm_attribute for hana_* attributes",
             example_line=f"{sid_lower}adm ALL=(ALL) NOPASSWD: /usr/sbin/crm_attribute -n hana_*",
         ),
@@ -142,7 +142,7 @@ def _legacy_sudoers(sid: str) -> List[SudoersEntry]:
             #   rh1adm ALL=(ALL) NOPASSWD: ..., /usr/sbin/crm_attribute -n hana_rh1_*
             #   (ALL) NOPASSWD: /usr/sbin/crm_attribute -n hana_rh1_site_srHook_* (SAP HA role)
             #   Cmnd_Alias ... crm_attribute ... hana_
-            line_pattern=rf"(NOPASSWD:.*(/usr/sbin/)?crm_attribute\s+-n\s+hana_|Cmnd_Alias.*crm_attribute.*hana_)",
+            line_pattern=r"(NOPASSWD:.*(/usr/sbin/)?crm_attribute\s+-n\s+hana_|Cmnd_Alias.*crm_attribute.*hana_)",
             description=f"Allow crm_attribute for hana_{sid_lower}_* attributes",
             example_line=f"{sid_lower}adm ALL=(ALL) NOPASSWD: /usr/sbin/crm_attribute -n hana_{sid_lower}_*",
         ),

@@ -14,8 +14,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-from ..lib.cib_parser import CIBParser
-
 
 class SOSReportDiscoveryMixin:
     """Mixin providing SOSreport discovery methods for AccessDiscovery."""

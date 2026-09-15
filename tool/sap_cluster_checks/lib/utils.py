@@ -8,7 +8,6 @@ This module contains helper functions for:
 """
 
 import os
-import sys
 import subprocess
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed

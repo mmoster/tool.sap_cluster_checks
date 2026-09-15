@@ -6,7 +6,7 @@ a shell command or configuration text the operator can apply directly.
 
 from typing import Tuple
 
-from .models import HookConfig, SudoersEntry
+from .models import ArchType, HookConfig, SudoersEntry
 
 # ---------------------------------------------------------------------------
 # global.ini fixes
