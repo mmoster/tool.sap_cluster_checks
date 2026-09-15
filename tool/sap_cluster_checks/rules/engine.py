@@ -60,6 +60,7 @@ class RuleDefinition:
     """Parsed rule definition from YAML."""
 
     check_id: str = None
+    version: str = None
     severity: str = None
     description: str = None
     enabled: bool = True
@@ -69,6 +70,7 @@ class RuleDefinition:
     parser: Dict[str, Any] = None
     validation_logic: Dict[str, Any] = None
     topology_filter: Any = None  # str, list of str, or None (all topologies)
+    requires: str = None  # Check ID that must pass before this check runs
     raw_yaml: Dict[str, Any] = None
 
     def __post_init__(self):
@@ -336,6 +338,31 @@ class RulesEngine:
         """Set nodes confirmed to not have HANA (from CHK_HANA_INSTALLED)."""
         self._non_hana_nodes = nodes
 
+    def get_summary(self) -> Dict[str, Any]:
+        """Summarize check results into counts and failure lists."""
+        total = len(self.results)
+        passed = sum(1 for r in self.results if r.status == CheckStatus.PASSED)
+        failed = sum(1 for r in self.results if r.status == CheckStatus.FAILED)
+        skipped = sum(1 for r in self.results if r.status == CheckStatus.SKIPPED)
+        errors = sum(1 for r in self.results if r.status == CheckStatus.ERROR)
+        critical_failures = [
+            r for r in self.results
+            if r.status == CheckStatus.FAILED and r.severity == Severity.CRITICAL
+        ]
+        warnings = [
+            r for r in self.results
+            if r.status == CheckStatus.FAILED and r.severity in (Severity.WARNING, Severity.INFO)
+        ]
+        return {
+            "total": total,
+            "passed": passed,
+            "failed": failed,
+            "skipped": skipped,
+            "errors": errors,
+            "critical_failures": critical_failures,
+            "warnings": warnings,
+        }
+
     def get_data_source_info(self) -> Dict[str, Any]:
         """Get summary of data sources used for checks.
 
@@ -436,6 +463,7 @@ class RulesEngine:
 
                 rule = RuleDefinition(
                     check_id=data.get("check_id", rule_file.stem),
+                    version=data.get("version"),
                     severity=data.get("severity", "WARNING"),
                     description=data.get("description", ""),
                     enabled=data.get("enabled", True),
@@ -445,6 +473,7 @@ class RulesEngine:
                     parser=data.get("parser", {}),
                     validation_logic=data.get("validation_logic", {}),
                     topology_filter=data.get("topology_filter"),
+                    requires=data.get("requires"),
                     raw_yaml=data,
                 )
                 self.rules.append(rule)
@@ -1387,11 +1416,27 @@ class RulesEngine:
                 passed = actual is not None
         elif operator == "not_exists":
             passed = actual is None
+        elif operator == "eq":
+            passed = actual == expected
+        elif operator == "ne":
+            passed = actual != expected
         elif operator == "in":
             passed = actual in expected if isinstance(expected, list) else actual == expected
+        elif operator == "not_in":
+            passed = actual not in expected if isinstance(expected, list) else actual != expected
+        elif operator == "contains":
+            passed = expected in actual if actual is not None else False
+        elif operator == "regex":
+            import re as _re
+            passed = bool(_re.search(expected, actual)) if actual is not None else False
         elif operator == "gt":
             try:
                 passed = float(actual) > float(expected)
+            except (TypeError, ValueError):
+                passed = False
+        elif operator == "lt":
+            try:
+                passed = float(actual) < float(expected)
             except (TypeError, ValueError):
                 passed = False
         else:
