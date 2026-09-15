@@ -29,7 +29,7 @@ import yaml
 from .access.discover_access import AccessDiscovery
 from .access.config_display import show_config, delete_config, export_ansible_vars
 from .access.sosreport_ops import fetch_sosreports, create_and_fetch_sosreports
-from .rules.engine import RulesEngine, CheckResult, CheckStatus, Severity, CheckDispatch
+from .rules.engine import RulesEngine, CheckResult, CheckStatus, Severity, CheckDispatch, get_rhel_major
 from .lib import (
     get_redhat_doc_urls,
     print_guide,
@@ -138,6 +138,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
     # Default rules path relative to script directory
     DEFAULT_RULES_PATH = str(SCRIPT_DIR / "rules" / "health_checks")
+    MAX_PARALLEL_RULES = 4
 
     def __init__(
         self,
@@ -214,13 +215,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
     def _get_rhel_major(self) -> int:
         """Get RHEL major version from discovered cluster config, default 9."""
-        if self.access_config and hasattr(self.access_config, "clusters"):
-            for cinfo in self.access_config.clusters.values():
-                rv = cinfo.get("rhel_version", "")
-                m = re.search(r"(\d+)", str(rv))
-                if m:
-                    return int(m.group(1))
-        return 9
+        return get_rhel_major(self.access_config)
 
     def _extract_cluster_config(self, cluster_name: str = None) -> dict:
         """
@@ -681,7 +676,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         all_results = []
-        max_parallel_rules = min(len(rules), 4)  # Max 4 rules in parallel
+        max_parallel_rules = min(len(rules), self.MAX_PARALLEL_RULES)
 
         with ThreadPoolExecutor(max_workers=max_parallel_rules) as executor:
             futures = {}

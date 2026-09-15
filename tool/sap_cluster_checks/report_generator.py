@@ -289,7 +289,7 @@ class HealthCheckPDF(FPDF):
         self.ln(5)
 
 
-def _strip_pkg_prefix(version_str, _pkg_key):
+def _strip_pkg_prefix(version_str):
     """Strip the package name prefix from an RPM version string.
 
     RPM versions follow the pattern 'name-version-release.dist'.
@@ -390,7 +390,7 @@ def _render_version_table(pdf, check):
             version = node_versions.get(node, "N/A")
             version_str = str(version) if version else "not installed"
             # Strip package name prefix - row label already shows it
-            version_str = _strip_pkg_prefix(version_str, pkg_key)
+            version_str = _strip_pkg_prefix(version_str)
             # Highlight cells that differ from the reference node
             if has_diff and str(version) != str(ref_value):
                 pdf.set_text_color(*PdfColors.RED)
@@ -403,47 +403,10 @@ def _render_version_table(pdf, check):
     pdf.ln(2)
 
 
-def generate_health_check_report(  # pylint: disable=redefined-outer-name
-    results: List[Dict],
-    summary: Dict,
-    cluster_info: Dict,
-    output_path: str = None,
-    install_status: Dict = None,
-    verbose: bool = False,
-) -> str:
-    """
-    Generate a PDF health check report.
-
-    Args:
-        results: List of check results
-        summary: Summary statistics
-        cluster_info: Cluster information (name, nodes, etc.)
-        output_path: Output file path (optional)
-        install_status: Installation status dict (optional)
-        verbose: If True, show all checks in detail (not just failed/warnings)
-
-    Returns:
-        Path to generated PDF file
-
-    Raises:
-        ImportError: If fpdf2 is not installed
-    """
-    if not FPDF_AVAILABLE:
-        raise ImportError("PDF generation requires fpdf2. Install with: pip install fpdf2")
-
-    cluster_name = cluster_info.get("cluster_name", "Unknown Cluster")
-    nodes = cluster_info.get("nodes", [])
-
-    pdf = HealthCheckPDF(cluster_name=cluster_name)
-    pdf.alias_nb_pages()
-    pdf.add_page()
-
-    # =========================================================================
-    # EXECUTIVE SUMMARY
-    # =========================================================================
+def _render_executive_summary(pdf, summary, cluster_info, install_status, cluster_name, nodes):
+    """Render the executive summary section of the PDF report."""
     pdf.chapter_title("Executive Summary")
 
-    # Overall status
     total = summary.get("total", 0)
     passed = summary.get("passed", 0)
     failed = summary.get("failed", 0)
@@ -452,9 +415,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     # Check installation completeness
     install_complete = True
-    steps_done = 0
     steps_total = 7
-    missing_steps = []
     if install_status:
         steps_done = sum(
             1
@@ -470,14 +431,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             if v
         )
         install_complete = steps_done >= steps_total
-
-        # Build list of missing steps
-        if not install_status.get("stonith_configured"):
-            missing_steps.append("stonith")
-        if not install_status.get("hana_resources"):
-            missing_steps.append("hana_resources")
-        if not install_status.get("cluster_configured"):
-            missing_steps.append("cluster")
 
     # Determine overall status considering both checks and installation
     hana_resource_state = cluster_info.get("hana_resource_state")
@@ -515,28 +468,22 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     else:
         overall_status = "HEALTHY"
 
-    # Status summary table
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(40, 8, "Overall Status: ")
     pdf.status_badge(overall_status)
     pdf.ln(6)
-    # Add status description in smaller font
     pdf.set_font("Helvetica", "I", 9)
     pdf.set_text_color(*PdfColors.GRAY)
     pdf.cell(0, 5, status_descriptions.get(overall_status, ""), ln=True)
     pdf.set_text_color(*PdfColors.BLACK)
     pdf.ln(4)
 
-    # Build info table with data source information
-    data_source = cluster_info.get("data_source", "Unknown")
-    used_cib_xml = cluster_info.get("used_cib_xml", False)
-
     info_data = {
         "Cluster Name": cluster_name,
         "Nodes": ", ".join(nodes) if nodes else "N/A",
         "RHEL Version": cluster_info.get("rhel_version", "N/A"),
         "Resource Agent": cluster_info.get("resource_agent", "N/A"),
-        "Data Source": data_source,
+        "Data Source": cluster_info.get("data_source", "Unknown"),
         "Report Date": datetime.now().strftime("%d %B %Y, %H:%M"),
         "Total Checks": str(total),
         "Passed": str(passed),
@@ -546,186 +493,187 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     }
 
     pdf.info_table(info_data)
-
     pdf.ln(5)
 
-    # =========================================================================
-    # DATA SOURCE INFO BOX (SOSreport / cib.xml usage)
-    # =========================================================================
+
+def _render_data_source_info(pdf, cluster_info):
+    """Render the data source info box for SOSreport analysis."""
     access_method = cluster_info.get("access_method", "unknown")
+    if access_method != "sosreport":
+        return
+
+    used_cib_xml = cluster_info.get("used_cib_xml", False)
     cluster_running = cluster_info.get("cluster_running", True)
 
-    if access_method == "sosreport":
-        # Info box for sosreport analysis
-        # Only show "cluster was stopped" when cib.xml was used AND cluster was not running
-        if used_cib_xml and not cluster_running:
-            # Yellow warning - cluster was stopped when sosreport was taken
-            pdf.set_fill_color(255, 243, 205)  # Light yellow background
-            pdf.set_draw_color(255, 193, 7)  # Yellow border
-            pdf.set_text_color(133, 100, 4)  # Dark yellow/brown text
-            box_title = "INFO: Analyzing SOSreport (cluster was stopped)"
-            box_text = (
-                "This analysis is based on SOSreport data. The cluster was not running when "
-                "the SOSreport was collected, so cluster configuration was read from cib.xml. "
-                "Some checks (node status, quorum, resource status) reflect the offline state."
-            )
-        else:
-            # Blue info - sosreport analysis
-            pdf.set_fill_color(217, 237, 247)  # Light blue background
-            pdf.set_draw_color(49, 112, 143)  # Blue border
-            pdf.set_text_color(31, 78, 121)  # Dark blue text
-            box_title = "INFO: Analyzing SOSreport (offline data)"
-            box_text = (
-                "This analysis is based on SOSreport data collected from cluster nodes. "
-                "No live SSH access was used. Results reflect the cluster state at the time "
-                "the SOSreport was collected."
-            )
+    if used_cib_xml and not cluster_running:
+        pdf.set_fill_color(255, 243, 205)
+        pdf.set_draw_color(255, 193, 7)
+        pdf.set_text_color(133, 100, 4)
+        box_title = "INFO: Analyzing SOSreport (cluster was stopped)"
+        box_text = (
+            "This analysis is based on SOSreport data. The cluster was not running when "
+            "the SOSreport was collected, so cluster configuration was read from cib.xml. "
+            "Some checks (node status, quorum, resource status) reflect the offline state."
+        )
+    else:
+        pdf.set_fill_color(217, 237, 247)
+        pdf.set_draw_color(49, 112, 143)
+        pdf.set_text_color(31, 78, 121)
+        box_title = "INFO: Analyzing SOSreport (offline data)"
+        box_text = (
+            "This analysis is based on SOSreport data collected from cluster nodes. "
+            "No live SSH access was used. Results reflect the cluster state at the time "
+            "the SOSreport was collected."
+        )
 
-        pdf.set_line_width(0.5)
-        pdf.set_font("Helvetica", "B", 11)
+    pdf.set_line_width(0.5)
+    pdf.set_font("Helvetica", "B", 11)
 
-        y_start = pdf.get_y()
-        pdf.rect(10, y_start, 190, 24, "DF")
-        pdf.set_xy(15, y_start + 3)
-        pdf.cell(0, 6, box_title, ln=True)
+    y_start = pdf.get_y()
+    pdf.rect(10, y_start, 190, 24, "DF")
+    pdf.set_xy(15, y_start + 3)
+    pdf.cell(0, 6, box_title, ln=True)
 
-        pdf.set_xy(15, y_start + 10)
-        pdf.set_font("Helvetica", "", 9)
-        pdf.multi_cell(180, 4, box_text)
+    pdf.set_xy(15, y_start + 10)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.multi_cell(180, 4, box_text)
 
-        pdf.set_text_color(*PdfColors.BLACK)
-        pdf.set_line_width(0.2)
-        pdf.ln(8)
+    pdf.set_text_color(*PdfColors.BLACK)
+    pdf.set_line_width(0.2)
+    pdf.ln(8)
 
-    # =========================================================================
-    # CLUSTER NOT RUNNING WARNING (for live access AND SOSreports)
-    # =========================================================================
+
+def _determine_cluster_running(cluster_info, install_status):
+    """Determine if the cluster is running, considering install_status for live systems."""
     cluster_running = cluster_info.get("cluster_running", True)
+    access_method = cluster_info.get("access_method", "unknown")
 
-    # Also check install_status for live systems
     if install_status and access_method != "sosreport":
-        # Check if cluster is configured but not running
         has_config = install_status.get("corosync_conf_exists") or install_status.get("cib_exists")
         pacemaker_running = install_status.get("pacemaker_running")
         if has_config and not pacemaker_running:
             cluster_running = False
 
-    if not cluster_running:
-        # Determine warning message based on access method
-        if access_method == "sosreport":
-            warning_title = "WARNING: Cluster Was Not Running When SOSreport Was Captured"
-            warning_text = (
-                "The SOSreport was collected while Pacemaker was not running. Health check results "
-                "may be incomplete or inaccurate. Checks that require live cluster data (quorum, "
-                "node status, resource status, replication status) will report ERROR status. "
-                "Consider creating new SOSreports with the cluster running."
-            )
-        else:
-            warning_title = "WARNING: Cluster Services Not Running"
-            warning_text = (
-                "The cluster is configured but Pacemaker is not running. Health check results "
-                "may be incomplete or inaccurate. Checks that require live cluster data (quorum, "
-                "node status, resource status, replication status) will report ERROR status."
-            )
+    return cluster_running
 
-        # Add prominent warning box
-        pdf.set_fill_color(255, 243, 205)  # Light yellow background
-        pdf.set_draw_color(255, 193, 7)  # Yellow border
-        pdf.set_line_width(0.5)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.set_text_color(133, 100, 4)  # Dark yellow/brown text
 
-        # Warning box
-        y_start = pdf.get_y()
-        pdf.rect(10, y_start, 190, 38, "DF")
-        pdf.set_xy(15, y_start + 3)
-        pdf.cell(0, 6, warning_title, ln=True)
+def _render_cluster_not_running_warning(pdf, cluster_info, cluster_running):
+    """Render the cluster-not-running warning box."""
+    if cluster_running:
+        return
 
-        pdf.set_xy(15, y_start + 10)
-        pdf.set_font("Helvetica", "", 9)
-        pdf.multi_cell(180, 4, warning_text)
-        pdf.set_xy(15, y_start + 22)
-        pdf.set_font("Helvetica", "B", 9)
-        pdf.cell(0, 4, "To start the cluster and rerun the health check:")
-        pdf.set_xy(15, y_start + 28)
-        pdf.set_font("Courier", "", 9)
-        pdf.set_fill_color(245, 245, 245)
-        pdf.cell(180, 5, "  pcs cluster start --all", fill=True)
-
-        pdf.set_text_color(*PdfColors.BLACK)
-        pdf.set_line_width(0.2)
-        pdf.ln(20)
-
-    # =========================================================================
-    # HANA RESOURCE NOT MANAGED WARNING
-    # =========================================================================
-    hana_resource_state = cluster_info.get("hana_resource_state")
-    if hana_resource_state and hana_resource_state in (
-        "stopped", "disabled", "unmanaged", "maintenance",
-    ):
-        state_descriptions = {
-            "stopped": "HANA resource is stopped in Pacemaker",
-            "disabled": "HANA resource is disabled in Pacemaker (target-role=Stopped)",
-            "unmanaged": "HANA resource is in unmanaged state",
-            "maintenance": "HANA resource is in maintenance mode",
-        }
-
-        warning_title = f"WARNING: {state_descriptions.get(hana_resource_state)}"
+    access_method = cluster_info.get("access_method", "unknown")
+    if access_method == "sosreport":
+        warning_title = "WARNING: Cluster Was Not Running When SOSreport Was Captured"
         warning_text = (
-            f"The SAP HANA cluster resource is {hana_resource_state}. "
-            "HANA is NOT managed by Pacemaker in this state. "
-            "Checks that depend on Pacemaker resource status (promoted/unpromoted roles, site roles, "
-            "SR status via Pacemaker) have been skipped. "
+            "The SOSreport was collected while Pacemaker was not running. Health check results "
+            "may be incomplete or inaccurate. Checks that require live cluster data (quorum, "
+            "node status, resource status, replication status) will report ERROR status. "
+            "Consider creating new SOSreports with the cluster running."
+        )
+    else:
+        warning_title = "WARNING: Cluster Services Not Running"
+        warning_text = (
+            "The cluster is configured but Pacemaker is not running. Health check results "
+            "may be incomplete or inaccurate. Checks that require live cluster data (quorum, "
+            "node status, resource status, replication status) will report ERROR status."
         )
 
-        # Include DB running status if available
-        hana_db_status_info = cluster_info.get("hana_db_status") or {}
-        db_running = hana_db_status_info.get("db_running", False)
+    pdf.set_fill_color(255, 243, 205)
+    pdf.set_draw_color(255, 193, 7)
+    pdf.set_line_width(0.5)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(133, 100, 4)
 
-        if db_running:
-            running_on = hana_db_status_info.get("running_nodes", [])
-            warning_text += (
-                f"The HANA database is still running ({', '.join(running_on)}). "
-                "Replication info was gathered directly from HANA. "
-            )
-        else:
-            warning_text += "The HANA database is NOT running. "
+    y_start = pdf.get_y()
+    pdf.rect(10, y_start, 190, 38, "DF")
+    pdf.set_xy(15, y_start + 3)
+    pdf.cell(0, 6, warning_title, ln=True)
 
-        if hana_resource_state == "disabled":
-            warning_text += "To re-enable: pcs resource enable <resource_name>"
-        elif hana_resource_state == "stopped":
-            warning_text += "To start the resource: pcs resource start <resource_name>"
-        elif hana_resource_state == "unmanaged":
-            warning_text += "To restore management: pcs resource manage <resource_name>"
-        elif hana_resource_state == "maintenance":
-            warning_text += (
-                "To exit maintenance: pcs resource meta <resource_name> maintenance=false"
-            )
+    pdf.set_xy(15, y_start + 10)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.multi_cell(180, 4, warning_text)
+    pdf.set_xy(15, y_start + 22)
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.cell(0, 4, "To start the cluster and rerun the health check:")
+    pdf.set_xy(15, y_start + 28)
+    pdf.set_font("Courier", "", 9)
+    pdf.set_fill_color(245, 245, 245)
+    pdf.cell(180, 5, "  pcs cluster start --all", fill=True)
 
-        # Yellow warning box (same style as "Cluster Not Running")
-        pdf.set_fill_color(255, 243, 205)  # Light yellow background
-        pdf.set_draw_color(255, 193, 7)  # Yellow border
-        pdf.set_line_width(0.5)
-        pdf.set_font("Helvetica", "B", 11)
-        pdf.set_text_color(133, 100, 4)  # Dark yellow/brown text
+    pdf.set_text_color(*PdfColors.BLACK)
+    pdf.set_line_width(0.2)
+    pdf.ln(20)
 
-        y_start = pdf.get_y()
-        # Dynamic height: disabled state has longer text
-        box_height = 36 if hana_resource_state == "disabled" else 30
-        pdf.rect(10, y_start, 190, box_height, "DF")
-        pdf.set_xy(15, y_start + 3)
-        pdf.cell(0, 5, warning_title, ln=True)
-        pdf.set_xy(15, y_start + 10)
-        pdf.set_font("Helvetica", "", 9)
-        pdf.multi_cell(180, 4, warning_text)
 
-        pdf.set_text_color(*PdfColors.BLACK)
-        pdf.set_line_width(0.2)
-        pdf.ln(8)
+def _render_hana_not_managed_warning(pdf, cluster_info):
+    """Render the HANA-resource-not-managed warning box."""
+    hana_resource_state = cluster_info.get("hana_resource_state")
+    if not hana_resource_state or hana_resource_state not in (
+        "stopped", "disabled", "unmanaged", "maintenance",
+    ):
+        return
 
-    # =========================================================================
-    # CLUSTER CONFIGURATION
-    # =========================================================================
+    state_descriptions = {
+        "stopped": "HANA resource is stopped in Pacemaker",
+        "disabled": "HANA resource is disabled in Pacemaker (target-role=Stopped)",
+        "unmanaged": "HANA resource is in unmanaged state",
+        "maintenance": "HANA resource is in maintenance mode",
+    }
+
+    warning_title = f"WARNING: {state_descriptions.get(hana_resource_state)}"
+    warning_text = (
+        f"The SAP HANA cluster resource is {hana_resource_state}. "
+        "HANA is NOT managed by Pacemaker in this state. "
+        "Checks that depend on Pacemaker resource status (promoted/unpromoted roles, site roles, "
+        "SR status via Pacemaker) have been skipped. "
+    )
+
+    hana_db_status_info = cluster_info.get("hana_db_status") or {}
+    db_running = hana_db_status_info.get("db_running", False)
+
+    if db_running:
+        running_on = hana_db_status_info.get("running_nodes", [])
+        warning_text += (
+            f"The HANA database is still running ({', '.join(running_on)}). "
+            "Replication info was gathered directly from HANA. "
+        )
+    else:
+        warning_text += "The HANA database is NOT running. "
+
+    if hana_resource_state == "disabled":
+        warning_text += "To re-enable: pcs resource enable <resource_name>"
+    elif hana_resource_state == "stopped":
+        warning_text += "To start the resource: pcs resource start <resource_name>"
+    elif hana_resource_state == "unmanaged":
+        warning_text += "To restore management: pcs resource manage <resource_name>"
+    elif hana_resource_state == "maintenance":
+        warning_text += (
+            "To exit maintenance: pcs resource meta <resource_name> maintenance=false"
+        )
+
+    pdf.set_fill_color(255, 243, 205)
+    pdf.set_draw_color(255, 193, 7)
+    pdf.set_line_width(0.5)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(133, 100, 4)
+
+    y_start = pdf.get_y()
+    box_height = 36 if hana_resource_state == "disabled" else 30
+    pdf.rect(10, y_start, 190, box_height, "DF")
+    pdf.set_xy(15, y_start + 3)
+    pdf.cell(0, 5, warning_title, ln=True)
+    pdf.set_xy(15, y_start + 10)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.multi_cell(180, 4, warning_text)
+
+    pdf.set_text_color(*PdfColors.BLACK)
+    pdf.set_line_width(0.2)
+    pdf.ln(8)
+
+
+def _render_cluster_configuration(pdf, cluster_info, nodes, verbose):
+    """Render the cluster configuration section of the PDF report."""
     pdf.chapter_title("Cluster Configuration")
 
     pdf.info_table(
@@ -740,10 +688,8 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     # Node list
     pdf.sub_section("Cluster Nodes")
-    # Majority makers are ONLY applicable for Scale-Out clusters
     is_scale_out = cluster_info.get("cluster_type") == "Scale-Out"
     majority_makers = cluster_info.get("majority_makers", []) if is_scale_out else []
-    # Nodes excluded from HANA by location constraints (app servers or majority makers)
     resource_config = cluster_info.get("resource_config") or {}
     hana_excluded_node = resource_config.get("hana_excluded_node")
     excluded_nodes = set(majority_makers)
@@ -751,7 +697,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         excluded_nodes.add(hana_excluded_node)
     for node in nodes:
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(5, 6, "-")  # Bullet point
+        pdf.cell(5, 6, "-")
         if node in majority_makers:
             pdf.set_font("Helvetica", "I", 10)
             pdf.cell(0, 6, f"{node} (MajorityMaker)", new_x="LMARGIN", new_y="NEXT")
@@ -767,7 +713,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         else:
             pdf.cell(0, 6, node, new_x="LMARGIN", new_y="NEXT")
 
-    # Note about constraint-excluded nodes
     if excluded_nodes:
         pdf.ln(2)
         pdf.set_font("Helvetica", "I", 8)
@@ -792,7 +737,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     pdf.ln(5)
 
-    # Node Details (in verbose mode or when available)
+    # Node Details
     node1_hostname = cluster_info.get("node1_hostname", "")
     node1_fqdn = cluster_info.get("node1_fqdn", "")
     node1_ip = cluster_info.get("node1_ip", "")
@@ -800,7 +745,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     node2_fqdn = cluster_info.get("node2_fqdn", "")
     node2_ip = cluster_info.get("node2_ip", "")
 
-    # Only display IP if it's actually a valid IP address (not a hostname)
     node1_ip_valid = node1_ip if is_valid_ip(node1_ip) else ""
     node2_ip_valid = node2_ip if is_valid_ip(node2_ip) else ""
 
@@ -831,9 +775,8 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                 pdf.info_table(node2_info)
             pdf.ln(3)
 
-    # SAP HANA HA Parameters (Ansible-compatible)
+    # SAP HANA HA Parameters
     sid = cluster_info.get("sid")
-    # Show HANA config in verbose mode even without SID
     show_hana_config = sid or verbose
     if show_hana_config:
         pdf.sub_section("SAP HANA Configuration")
@@ -852,11 +795,9 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             hana_config["Operation Mode"] = cluster_info.get("operation_mode")
         if cluster_info.get("secondary_read") is not None:
             hana_config["Secondary Read Enabled"] = str(cluster_info.get("secondary_read"))
-        # Site names
         site1 = cluster_info.get("site1_name", "")
         site2 = cluster_info.get("site2_name", "")
         sites = cluster_info.get("sites", [])
-        # Normalize: old reports may have sites as dict instead of list
         if isinstance(sites, dict):
             sites = list(sites.values()) if sites else []
         if site1:
@@ -890,7 +831,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         topology_resource = cluster_info.get("topology_resource")
         if topology_resource:
             pdf.sub_section("SAPHanaTopology Resource")
-            # Determine which nodes the clone actually runs on
             hana_nodes = [n for n in nodes if n not in excluded_nodes]
             clone_desc = f"clone (runs on: {', '.join(hana_nodes)})"
             topo_config = {
@@ -906,7 +846,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             pdf.info_table(topo_config)
             pdf.ln(3)
 
-        # SAPHanaController Resource / SAPHana Resource
+        # SAPHanaController / SAPHana Resource
         res_config = {}
         resource_type = cluster_info.get("resource_type")
         resource_name = cluster_info.get("resource_name")
@@ -955,18 +895,15 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         if stonith_config:
             pdf.sub_section("STONITH/Fencing Configuration")
             pdf.info_table(stonith_config)
-            # Show pcmk_host_map in a formatted table
             if stonith_params and stonith_params.get("pcmk_host_map"):
                 pdf.ln(3)
                 pdf.set_font("Helvetica", "B", 9)
                 pdf.cell(0, 5, "STONITH Host Mapping (pcmk_host_map):", ln=True)
                 pdf.ln(1)
-                # Table header
                 pdf.set_fill_color(240, 240, 240)
                 pdf.set_font("Helvetica", "B", 8)
                 pdf.cell(60, 5, "Cluster Node", border=1, fill=True)
                 pdf.cell(80, 5, "STONITH Target", border=1, fill=True, ln=True)
-                # Table rows
                 pdf.set_font("Helvetica", "", 8)
                 host_map = stonith_params.get("pcmk_host_map", "")
                 hosts = host_map.split(";")
@@ -978,245 +915,233 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
         pdf.ln(5)
 
-    # =========================================================================
-    # HANA DATABASE STATUS & REPLICATION
-    # =========================================================================
+
+def _render_hana_db_status(pdf, cluster_info):
+    """Render the HANA database status and replication section."""
     hana_db_status = cluster_info.get("hana_db_status")
-    if hana_db_status:
-        pdf.sub_section("HANA Database Status")
+    if not hana_db_status:
+        pdf.ln(5)
+        return
 
-        db_running = hana_db_status.get("db_running", False)
-        hana_managed = hana_db_status.get("hana_managed", False)
-        running_nodes = hana_db_status.get("running_nodes", [])
-        stopped_nodes = hana_db_status.get("stopped_nodes", [])
-        resource_state = hana_db_status.get("hana_resource_state", "unknown")
+    pdf.sub_section("HANA Database Status")
 
-        # Build status info table
-        db_status_info = {}
-        hana_version = hana_db_status.get("hana_version")
-        if hana_version:
-            hana_sp = hana_db_status.get("hana_sp", "")
-            version_display = hana_version
-            if hana_sp:
-                version_display += f" (SPS{hana_sp})"
-            db_status_info["HANA Version"] = version_display
-        if db_running:
-            db_status_info["Database Running"] = f"Yes ({', '.join(running_nodes)})"
-        else:
-            db_status_info["Database Running"] = "No"
-        if stopped_nodes:
-            db_status_info["Database Stopped On"] = ", ".join(stopped_nodes)
+    db_running = hana_db_status.get("db_running", False)
+    hana_managed = hana_db_status.get("hana_managed", False)
+    running_nodes = hana_db_status.get("running_nodes", [])
+    stopped_nodes = hana_db_status.get("stopped_nodes", [])
+    resource_state = hana_db_status.get("hana_resource_state", "unknown")
 
-        if hana_managed:
-            db_status_info["Managed by Cluster"] = f"Yes (resource {resource_state})"
-        else:
-            reason = (
-                f"resource {resource_state}"
-                if resource_state != "unknown"
-                else "cluster not running"
-            )
-            db_status_info["Managed by Cluster"] = f"No ({reason})"
+    db_status_info = {}
+    hana_version = hana_db_status.get("hana_version")
+    if hana_version:
+        hana_sp = hana_db_status.get("hana_sp", "")
+        version_display = hana_version
+        if hana_sp:
+            version_display += f" (SPS{hana_sp})"
+        db_status_info["HANA Version"] = version_display
+    if db_running:
+        db_status_info["Database Running"] = f"Yes ({', '.join(running_nodes)})"
+    else:
+        db_status_info["Database Running"] = "No"
+    if stopped_nodes:
+        db_status_info["Database Stopped On"] = ", ".join(stopped_nodes)
 
-        db_status_info["Resource State"] = resource_state
+    if hana_managed:
+        db_status_info["Managed by Cluster"] = f"Yes (resource {resource_state})"
+    else:
+        reason = (
+            f"resource {resource_state}"
+            if resource_state != "unknown"
+            else "cluster not running"
+        )
+        db_status_info["Managed by Cluster"] = f"No ({reason})"
 
-        pdf.info_table(db_status_info)
-        pdf.ln(3)
+    db_status_info["Resource State"] = resource_state
 
-        # System Replication topology table
-        sr_topology = hana_db_status.get("sr_topology")
-        sr_source = hana_db_status.get("sr_source")
+    pdf.info_table(db_status_info)
+    pdf.ln(3)
 
-        if sr_topology and sr_topology.get("sites"):
-            pdf.sub_section("System Replication")
+    # System Replication topology table
+    sr_topology = hana_db_status.get("sr_topology")
+    sr_source = hana_db_status.get("sr_source")
 
-            # Mapping line: "DC1 -> DC2, DC1 -> DC3"
-            mapping = sr_topology.get("mapping", "")
+    if sr_topology and sr_topology.get("sites"):
+        pdf.sub_section("System Replication")
 
-            pdf.set_font("Helvetica", "B", 10)
-            pdf.set_text_color(*PdfColors.BLACK)
-            mapping_display = mapping if mapping else "Unknown"
-            pdf.cell(0, 6, mapping_display, ln=True)
+        mapping = sr_topology.get("mapping", "")
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*PdfColors.BLACK)
+        pdf.cell(0, 6, mapping if mapping else "Unknown", ln=True)
 
-            # Source attribution
-            if sr_source:
-                pdf.set_font("Helvetica", "I", 8)
-                pdf.set_text_color(100, 100, 100)
-                pdf.cell(0, 4, f"Source: {sr_source}", ln=True)
+        if sr_source:
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(100, 100, 100)
+            pdf.cell(0, 4, f"Source: {sr_source}", ln=True)
 
-            if not hana_managed:
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.set_text_color(133, 100, 4)
-                pdf.cell(0, 4, "Note: HANA is NOT managed by Pacemaker", ln=True)
-
-            pdf.set_text_color(*PdfColors.BLACK)
-            pdf.ln(2)
-
-            # Site topology table
-            row_h = 5
-            pdf.set_fill_color(240, 240, 240)
+        if not hana_managed:
             pdf.set_font("Helvetica", "B", 8)
-            pdf.cell(30, row_h, "Site", border=1, fill=True)
-            pdf.cell(25, row_h, "Role", border=1, fill=True)
-            pdf.cell(30, row_h, "Mode", border=1, fill=True, align="C")
-            pdf.cell(105, row_h, "HANA Instances", border=1, fill=True)
-            pdf.ln()
+            pdf.set_text_color(133, 100, 4)
+            pdf.cell(0, 4, "Note: HANA is NOT managed by Pacemaker", ln=True)
+
+        pdf.set_text_color(*PdfColors.BLACK)
+        pdf.ln(2)
+
+        row_h = 5
+        pdf.set_fill_color(240, 240, 240)
+        pdf.set_font("Helvetica", "B", 8)
+        pdf.cell(30, row_h, "Site", border=1, fill=True)
+        pdf.cell(25, row_h, "Role", border=1, fill=True)
+        pdf.cell(30, row_h, "Mode", border=1, fill=True, align="C")
+        pdf.cell(105, row_h, "HANA Instances", border=1, fill=True)
+        pdf.ln()
+
+        pdf.set_font("Helvetica", "", 8)
+        for site in sr_topology["sites"]:
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.cell(30, row_h, site.get("name", ""), border=1)
+
+            role = site.get("role", "")
+            if role == "primary":
+                pdf.set_text_color(*PdfColors.GREEN)
+            else:
+                pdf.set_text_color(0, 100, 180)
+            pdf.set_font("Helvetica", "B", 8)
+            pdf.cell(25, row_h, role, border=1)
+            pdf.set_text_color(*PdfColors.BLACK)
 
             pdf.set_font("Helvetica", "", 8)
-            for site in sr_topology["sites"]:
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.cell(30, row_h, site.get("name", ""), border=1)
+            op_mode_str = site.get("op_mode", "") or ""
+            pdf.cell(30, row_h, op_mode_str, border=1, align="C")
 
-                role = site.get("role", "")
-                if role == "primary":
-                    pdf.set_text_color(*PdfColors.GREEN)
-                else:
-                    pdf.set_text_color(0, 100, 180)  # Blue for secondary
-                pdf.set_font("Helvetica", "B", 8)
-                pdf.cell(25, row_h, role, border=1)
-                pdf.set_text_color(*PdfColors.BLACK)
+            hosts = site.get("hosts", [])
+            hosts_str = ", ".join(hosts) if hosts else "N/A"
+            pdf.set_font("Courier", "", 8)
+            pdf.cell(105, row_h, hosts_str, border=1)
+            pdf.ln()
 
-                pdf.set_font("Helvetica", "", 8)
-                op_mode_str = site.get("op_mode", "") or ""
-                pdf.cell(30, row_h, op_mode_str, border=1, align="C")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.ln(3)
 
-                # List hosts (coordinator first if detectable)
-                hosts = site.get("hosts", [])
-                hosts_str = ", ".join(hosts) if hosts else "N/A"
-                pdf.set_font("Courier", "", 8)
-                pdf.cell(105, row_h, hosts_str, border=1)
-                pdf.ln()
-
-            pdf.set_font("Helvetica", "", 10)
-            pdf.ln(3)
-
-        elif sr_source:
-            pdf.sub_section("System Replication")
-            pdf.set_font("Helvetica", "I", 9)
-            pdf.cell(0, 5, f"Source: {sr_source}", ln=True)
-            pdf.ln(3)
+    elif sr_source:
+        pdf.sub_section("System Replication")
+        pdf.set_font("Helvetica", "I", 9)
+        pdf.cell(0, 5, f"Source: {sr_source}", ln=True)
+        pdf.ln(3)
 
     pdf.ln(5)
 
-    # =========================================================================
-    # CONFIGURED RESOURCES (from cib.xml)
-    # =========================================================================
+
+def _render_configured_resources(pdf, cluster_info):
+    """Render the configured resources section from cib.xml."""
     resource_config = cluster_info.get("resource_config")
-    if resource_config and resource_config.get("available"):
-        pdf.add_page()
-        pdf.chapter_title("Configured Resources (from cib.xml)")
+    if not resource_config or not resource_config.get("available"):
+        return
 
-        # Resources summary
-        resources = resource_config.get("resources", {})
-        if resources.get("list"):
-            pdf.sub_section("Cluster Resources")
+    pdf.add_page()
+    pdf.chapter_title("Configured Resources (from cib.xml)")
+
+    resources = resource_config.get("resources", {})
+    if resources.get("list"):
+        pdf.sub_section("Cluster Resources")
+        pdf.set_font("Courier", "", 8)
+        for resource in resources.get("list", [])[:20]:
+            pdf.set_x(10)
+            pdf.multi_cell(0, 4, f"- {resource[:90]}")
+        if len(resources.get("list", [])) > 20:
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_x(10)
+            pdf.cell(0, 4, f"  ... and {len(resources['list']) - 20} more resources", ln=True)
+        pdf.ln(3)
+
+    sap_hana = resource_config.get("sap_hana", {})
+    if sap_hana:
+        pdf.sub_section("SAP HANA Resource Configuration")
+        for resource_name, attrs in sap_hana.items():
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.cell(0, 5, resource_name[:60], ln=True)
             pdf.set_font("Courier", "", 8)
-            for resource in resources.get("list", [])[:20]:  # Limit to 20 resources
-                pdf.set_x(10)  # Reset to left margin
-                pdf.multi_cell(0, 4, f"- {resource[:90]}")  # Truncate long lines
-            if len(resources.get("list", [])) > 20:
-                pdf.set_font("Helvetica", "I", 8)
+            for key, value in attrs.items():
+                val_str = str(value)[:80]
+                pdf.cell(0, 4, f"  {key}={val_str}", ln=True)
+            pdf.ln(2)
+
+    constraints = resource_config.get("constraints", {})
+
+    resource_discovery = constraints.get("resource_discovery", [])
+    if resource_discovery:
+        pdf.sub_section("Resource Discovery Settings")
+        pdf.set_font("Courier", "", 8)
+        for rd in resource_discovery[:15]:
+            pdf.set_x(10)
+            pdf.multi_cell(0, 4, rd[:100])
+        if len(resource_discovery) > 15:
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_x(10)
+            pdf.cell(0, 4, f"  ... and {len(resource_discovery) - 15} more", ln=True)
+        pdf.ln(3)
+
+    location = constraints.get("location", [])
+    if location:
+        pdf.sub_section("Location Constraints")
+        pdf.set_font("Courier", "", 7)
+        shown = 0
+        for loc in location:
+            if shown >= 20:
+                break
+            if loc.startswith("resource") or loc.startswith("Resource"):
                 pdf.set_x(10)
-                pdf.cell(0, 4, f"  ... and {len(resources['list']) - 20} more resources", ln=True)
-            pdf.ln(3)
+                pdf.multi_cell(0, 3.5, loc[:100])
+                shown += 1
+        if (
+            len(
+                [
+                    ln
+                    for ln in location
+                    if ln.startswith("resource") or ln.startswith("Resource")
+                ]
+            )
+            > 20
+        ):
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_x(10)
+            pdf.cell(0, 4, "  ... more constraints in full output", ln=True)
+        pdf.ln(3)
 
-        # SAP HANA specific configuration
-        sap_hana = resource_config.get("sap_hana", {})
-        if sap_hana:
-            pdf.sub_section("SAP HANA Resource Configuration")
-            for resource_name, attrs in sap_hana.items():
-                pdf.set_font("Helvetica", "B", 9)
-                pdf.cell(0, 5, resource_name[:60], ln=True)
-                pdf.set_font("Courier", "", 8)
-                for key, value in attrs.items():
-                    # Truncate long values to prevent layout issues
-                    val_str = str(value)[:80]
-                    pdf.cell(0, 4, f"  {key}={val_str}", ln=True)
-                pdf.ln(2)
+    colocation = constraints.get("colocation", [])
+    if colocation:
+        pdf.sub_section("Colocation Constraints")
+        pdf.set_font("Courier", "", 8)
+        for col in colocation[:10]:
+            pdf.set_x(10)
+            pdf.multi_cell(0, 4, col[:100])
+        pdf.ln(3)
 
-        # Constraints summary
-        constraints = resource_config.get("constraints", {})
+    order = constraints.get("order", [])
+    if order:
+        pdf.sub_section("Order Constraints")
+        pdf.set_font("Courier", "", 8)
+        for ord_c in order[:10]:
+            pdf.set_x(10)
+            pdf.multi_cell(0, 4, ord_c[:100])
+        pdf.ln(3)
 
-        # Location constraints with resource-discovery
-        resource_discovery = constraints.get("resource_discovery", [])
-        if resource_discovery:
-            pdf.sub_section("Resource Discovery Settings")
-            pdf.set_font("Courier", "", 8)
-            for rd in resource_discovery[:15]:
-                pdf.set_x(10)
-                pdf.multi_cell(0, 4, rd[:100])
-            if len(resource_discovery) > 15:
-                pdf.set_font("Helvetica", "I", 8)
-                pdf.set_x(10)
-                pdf.cell(0, 4, f"  ... and {len(resource_discovery) - 15} more", ln=True)
-            pdf.ln(3)
+    stonith = resource_config.get("stonith", {})
+    if stonith.get("devices"):
+        pdf.sub_section("STONITH Devices (from cib.xml)")
+        pdf.set_font("Courier", "", 8)
+        for device in stonith.get("devices", [])[:10]:
+            pdf.set_x(10)
+            pdf.multi_cell(0, 4, device[:100])
+        pdf.ln(3)
 
-        # Location constraints
-        location = constraints.get("location", [])
-        if location:
-            pdf.sub_section("Location Constraints")
-            pdf.set_font("Courier", "", 7)
-            shown = 0
-            for loc in location:
-                if shown >= 20:
-                    break
-                if loc.startswith("resource") or loc.startswith("Resource"):
-                    pdf.set_x(10)
-                    pdf.multi_cell(0, 3.5, loc[:100])
-                    shown += 1
-            if (
-                len(
-                    [
-                        ln
-                        for ln in location
-                        if ln.startswith("resource") or ln.startswith("Resource")
-                    ]
-                )
-                > 20
-            ):
-                pdf.set_font("Helvetica", "I", 8)
-                pdf.set_x(10)
-                pdf.cell(0, 4, "  ... more constraints in full output", ln=True)
-            pdf.ln(3)
+    pdf.ln(5)
 
-        # Colocation constraints
-        colocation = constraints.get("colocation", [])
-        if colocation:
-            pdf.sub_section("Colocation Constraints")
-            pdf.set_font("Courier", "", 8)
-            for col in colocation[:10]:
-                pdf.set_x(10)
-                pdf.multi_cell(0, 4, col[:100])
-            pdf.ln(3)
 
-        # Order constraints
-        order = constraints.get("order", [])
-        if order:
-            pdf.sub_section("Order Constraints")
-            pdf.set_font("Courier", "", 8)
-            for ord_c in order[:10]:
-                pdf.set_x(10)
-                pdf.multi_cell(0, 4, ord_c[:100])
-            pdf.ln(3)
-
-        # STONITH info from cib
-        stonith = resource_config.get("stonith", {})
-        if stonith.get("devices"):
-            pdf.sub_section("STONITH Devices (from cib.xml)")
-            pdf.set_font("Courier", "", 8)
-            for device in stonith.get("devices", [])[:10]:
-                pdf.set_x(10)
-                pdf.multi_cell(0, 4, device[:100])
-            pdf.ln(3)
-
-        pdf.ln(5)
-
-    # =========================================================================
-    # CHECK RESULTS
-    # =========================================================================
+def _render_check_results(pdf, results, cluster_running, verbose):
+    """Render the health check results section. Returns (failed_checks, warning_checks)."""
     pdf.add_page()
     pdf.chapter_title("Health Check Results")
 
-    # Group results by status
     passed_checks = [r for r in results if r.get("status") == "PASSED"]
     failed_checks = [
         r for r in results if r.get("status") == "FAILED" and r.get("severity") != "WARNING"
@@ -1227,14 +1152,12 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     error_checks = [r for r in results if r.get("status") == "ERROR"]
     skipped_checks = [r for r in results if r.get("status") == "SKIPPED"]
 
-    # Critical/Failed checks first
     if failed_checks or error_checks:
         pdf.sub_section("Failed Checks")
 
-        # Add prominent note when cluster is stopped and there are errors
         if error_checks and not cluster_running:
-            pdf.set_fill_color(255, 243, 205)  # Light yellow background
-            pdf.set_draw_color(255, 193, 7)  # Yellow border
+            pdf.set_fill_color(255, 243, 205)
+            pdf.set_draw_color(255, 193, 7)
             pdf.set_line_width(0.3)
             y_note = pdf.get_y()
             pdf.rect(10, y_note, 190, 16, "DF")
@@ -1262,10 +1185,8 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                 check.get("message", ""),
                 check.get("node", ""),
             )
-            # Render version comparison table for package consistency checks
             _render_version_table(pdf, check)
 
-        # Add note about errors when cluster is stopped (for running cluster case)
         if error_checks and cluster_running:
             pdf.ln(3)
             pdf.set_font("Helvetica", "I", 9)
@@ -1279,7 +1200,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             pdf.set_text_color(0, 0, 0)
             pdf.ln(3)
 
-    # Warnings
     if warning_checks:
         pdf.sub_section("Warnings")
         for check in warning_checks:
@@ -1290,15 +1210,12 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                 check.get("message", ""),
                 check.get("node", ""),
             )
-            # Render version comparison table for package consistency checks
             _render_version_table(pdf, check)
 
-    # Passed checks
     if passed_checks:
         pdf.sub_section(f"Passed Checks ({len(passed_checks)})")
 
         if verbose:
-            # Verbose mode: show all passed checks in detail
             for check in passed_checks:
                 pdf.check_result_row(
                     check.get("check_id", "N/A"),
@@ -1307,10 +1224,8 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                     check.get("message", ""),
                     check.get("node", ""),
                 )
-                # Render version comparison table for package consistency checks
                 _render_version_table(pdf, check)
         else:
-            # Compact mode: list passed checks in 3-column format
             pdf.set_font("Helvetica", "", 9)
             pdf.set_text_color(*PdfColors.GREEN)
             for i, check in enumerate(passed_checks):
@@ -1325,12 +1240,10 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                 )
             pdf.ln(8)
 
-    # Skipped checks
     if skipped_checks:
         pdf.sub_section(f"Skipped Checks ({len(skipped_checks)})")
 
         if verbose:
-            # Verbose mode: show each skipped check with its reason
             for check in skipped_checks:
                 pdf.check_result_row(
                     check.get("check_id", "N/A"),
@@ -1340,7 +1253,6 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
                     check.get("node", ""),
                 )
         else:
-            # Compact mode: one-line summary with grouped reasons
             pdf.set_font("Helvetica", "I", 9)
             pdf.set_text_color(*PdfColors.GRAY)
             skip_reasons = set()
@@ -1361,15 +1273,16 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             reason_text = ", ".join(sorted(skip_reasons)) if skip_reasons else "not applicable"
             pdf.body_text(f"Skipped {len(skipped_checks)} checks ({reason_text})")
 
-    # =========================================================================
-    # RECOMMENDATIONS
-    # =========================================================================
+    return failed_checks, warning_checks
+
+
+def _render_recommendations(pdf, failed_checks, warning_checks):
+    """Render the recommendations section based on check results."""
     pdf.add_page()
     pdf.chapter_title("Recommendations")
 
     priority = 1
 
-    # Generate recommendations based on failed checks
     if any(c.get("check_id") == "CHK_STONITH_CONFIG" for c in failed_checks):
         pdf.recommendation_box(
             str(priority),
@@ -1425,7 +1338,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
     ):
         pdf.recommendation_box(
             str(priority),
-            "HA Degraded \u2014 No Failover Target",
+            "HA Degraded - No Failover Target",
             "The cluster has no secondary/unpromoted HANA instance. "
             "Automatic failover is not possible. Check if a node is in standby "
             "or if System Replication is broken.",
@@ -1480,7 +1393,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         )
         priority += 1
 
-    if priority == 1:  # No specific recommendations
+    if priority == 1:
         if warning_checks:
             pdf.body_text(
                 "No critical configuration issues found. "
@@ -1492,9 +1405,9 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
             )
         pdf.ln(5)
 
-    # =========================================================================
-    # BEST PRACTICES CHECKLIST
-    # =========================================================================
+
+def _render_best_practices(pdf):
+    """Render the best practices checklist."""
     pdf.chapter_title("Best Practices Checklist")
 
     best_practices = [
@@ -1510,7 +1423,7 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
 
     for practice, description in best_practices:
         pdf.set_font("Helvetica", "", 10)
-        pdf.cell(8, 6, "[ ]")  # Checkbox
+        pdf.cell(8, 6, "[ ]")
         pdf.set_font("Helvetica", "B", 10)
         pdf.cell(70, 6, practice)
         pdf.set_font("Helvetica", "I", 9)
@@ -1518,15 +1431,14 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         pdf.cell(0, 6, description, new_x="LMARGIN", new_y="NEXT")
         pdf.set_text_color(*PdfColors.BLACK)
 
-    # =========================================================================
-    # DOCUMENTATION REFERENCES
-    # =========================================================================
+
+def _render_documentation_references(pdf, cluster_info):
+    """Render the documentation references section."""
     pdf.ln(10)
     pdf.chapter_title("Documentation References")
 
-    # Extract RHEL major version for version-specific documentation URLs
     rhel_ver_str = cluster_info.get("rhel_version", "")
-    rhel_major = 9  # default
+    rhel_major = 9
     match = re.search(r"(\d+)", str(rhel_ver_str))
     if match:
         rhel_major = int(match.group(1))
@@ -1554,9 +1466,43 @@ def generate_health_check_report(  # pylint: disable=redefined-outer-name
         pdf.cell(0, 6, url, new_x="LMARGIN", new_y="NEXT", link=url)
         pdf.set_text_color(*PdfColors.BLACK)
 
-    # =========================================================================
-    # SAVE PDF
-    # =========================================================================
+
+def generate_health_check_report(  # pylint: disable=redefined-outer-name
+    results: List[Dict],
+    summary: Dict,
+    cluster_info: Dict,
+    output_path: str = None,
+    install_status: Dict = None,
+    verbose: bool = False,
+) -> str:
+    """Generate a PDF health check report."""
+    if not FPDF_AVAILABLE:
+        raise ImportError("PDF generation requires fpdf2. Install with: pip install fpdf2")
+
+    cluster_name = cluster_info.get("cluster_name", "Unknown Cluster")
+    nodes = cluster_info.get("nodes", [])
+
+    pdf = HealthCheckPDF(cluster_name=cluster_name)
+    pdf.alias_nb_pages()
+    pdf.add_page()
+
+    _render_executive_summary(pdf, summary, cluster_info, install_status, cluster_name, nodes)
+    _render_data_source_info(pdf, cluster_info)
+
+    cluster_running = _determine_cluster_running(cluster_info, install_status)
+    _render_cluster_not_running_warning(pdf, cluster_info, cluster_running)
+    _render_hana_not_managed_warning(pdf, cluster_info)
+
+    _render_cluster_configuration(pdf, cluster_info, nodes, verbose)
+    _render_hana_db_status(pdf, cluster_info)
+    _render_configured_resources(pdf, cluster_info)
+
+    failed_checks, warning_checks = _render_check_results(pdf, results, cluster_running, verbose)
+    _render_recommendations(pdf, failed_checks, warning_checks)
+
+    _render_best_practices(pdf)
+    _render_documentation_references(pdf, cluster_info)
+
     if output_path is None:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_path = f"health_check_report_{timestamp}.pdf"

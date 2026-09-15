@@ -268,6 +268,22 @@ class CheckDispatch:
         return warnings
 
 
+def get_rhel_major(access_config, default=9):
+    """Get RHEL major version from an access config (dataclass or dict)."""
+    if hasattr(access_config, "clusters"):
+        for cluster_info in access_config.clusters.values():
+            rv = cluster_info.get("rhel_version", "")
+            match = re.search(r"(\d+)", str(rv))
+            if match:
+                return int(match.group(1))
+    elif isinstance(access_config, dict):
+        rv = access_config.get("rhel_version", "")
+        match = re.search(r"(\d+)", str(rv))
+        if match:
+            return int(match.group(1))
+    return default
+
+
 class RulesEngine:
     """Engine for loading and executing health check rules."""
 
@@ -1263,22 +1279,13 @@ class RulesEngine:
 
     def _get_rhel_major(self) -> int:
         """Get RHEL major version from access config or prior results."""
-        # Try access config first (set during discovery)
-        if hasattr(self.access_config, "clusters"):
-            for cluster_info in self.access_config.clusters.values():
-                rv = cluster_info.get("rhel_version", "")
-                match = re.search(r"(\d+)", str(rv))
-                if match:
-                    return int(match.group(1))
-        elif isinstance(self.access_config, dict):
-            rv = self.access_config.get("rhel_version", "")
-            match = re.search(r"(\d+)", str(rv))
-            if match:
-                return int(match.group(1))
+        result = get_rhel_major(self.access_config)
+        if result != 9:
+            return result
         # Fallback: check CHK_PACKAGE_CONSISTENCY results for el<N> in package names
-        for result in self.results:
-            if result.check_id == "CHK_PACKAGE_CONSISTENCY" and result.details:
-                parsed = result.details.get("parsed", {})
+        for r in self.results:
+            if r.check_id == "CHK_PACKAGE_CONSISTENCY" and r.details:
+                parsed = r.details.get("parsed", {})
                 for _key, val in parsed.items():
                     if val:
                         el_match = re.search(r"\.el(\d+)", str(val))
