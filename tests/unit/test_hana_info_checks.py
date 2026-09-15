@@ -317,3 +317,114 @@ class TestHanaLandscape:
         passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.STATUS_EXPECTATION)
         assert passed is True
         assert pass_msg is None
+
+
+# ── CHK_ALERT_FENCING tests ─────────────────────────────────────────
+
+ALERT_FENCING_LIVE_OK = """\
+=== ALERTS ===
+Alerts:
+ Alert: alert-1 (path=/usr/share/pacemaker/alerts/SAPHanaSR-alert-fencing.sh)
+  Recipients:
+   Recipient: alert-1-rec1 (value=fence_aws)
+=== FENCING ===
+  * fence_aws	(stonith:fence_aws):	Started node1
+"""
+
+ALERT_FENCING_NO_ALERTS = """\
+=== ALERTS ===
+NO_ALERTS
+=== FENCING ===
+  * fence_aws	(stonith:fence_aws):	Started node1
+"""
+
+ALERT_FENCING_NO_FENCING = """\
+=== ALERTS ===
+Alerts:
+ Alert: alert-1 (path=/usr/share/pacemaker/alerts/SAPHanaSR-alert-fencing.sh)
+=== FENCING ===
+"""
+
+ALERT_FENCING_PCS_CONFIG = """\
+Alerts:
+ Alert: alert-1 (path=/usr/share/pacemaker/alerts/SAPHanaSR-alert-fencing.sh)
+
+Stonith Devices:
+  Resource: fence_sbd (class=stonith type=fence_sbd)
+   Attributes: fence_sbd-instance_attributes
+     devices=/dev/vdb
+   Operations:
+     monitor: fence_sbd-monitor-interval-600s
+       interval=600s timeout=15s
+"""
+
+
+class TestAlertFencing:
+    PARSER = {
+        "type": "regex",
+        "multiline": True,
+        "search_patterns": [
+            {"name": "alert_config", "regex": "(Alerts:|alert|SAPHanaSR-alert)", "group": 0},
+            {"name": "fence_config", "regex": "(stonith|fence_|fencing-topology|Started)", "group": 0},
+            {"name": "no_alerts", "regex": "NO_ALERTS", "group": 0},
+        ],
+    }
+
+    FENCE_EXPECTATION = {
+        "key": "fence_config",
+        "operator": "exists",
+        "message": "No STONITH/fencing configuration found",
+        "pass_message": "Fencing: ${fence_config}",
+    }
+
+    NO_ALERTS_EXPECTATION = {
+        "key": "no_alerts",
+        "operator": "not_exists",
+        "severity": "WARNING",
+        "message": "No SAPHanaSR alerts configured (recommended for automatic fence reaction)",
+    }
+
+    def test_parse_live_with_alerts_and_fencing(self):
+        result = _parse(ALERT_FENCING_LIVE_OK, self.PARSER)
+        assert result["alert_config"] is not None
+        assert result["fence_config"] is not None
+        assert result["no_alerts"] is None
+
+    def test_parse_no_alerts(self):
+        result = _parse(ALERT_FENCING_NO_ALERTS, self.PARSER)
+        assert result["no_alerts"] == "NO_ALERTS"
+        assert result["fence_config"] is not None
+
+    def test_parse_no_fencing(self):
+        result = _parse(ALERT_FENCING_NO_FENCING, self.PARSER)
+        assert result["fence_config"] is None
+
+    def test_parse_sosreport_pcs_config(self):
+        result = _parse(ALERT_FENCING_PCS_CONFIG, self.PARSER)
+        assert result["alert_config"] is not None
+        assert result["fence_config"] is not None
+        assert result["no_alerts"] is None
+
+    def test_validation_fencing_present_passes(self):
+        engine = RulesEngine()
+        parsed = _parse(ALERT_FENCING_LIVE_OK, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.FENCE_EXPECTATION)
+        assert passed is True
+
+    def test_validation_fencing_absent_fails(self):
+        engine = RulesEngine()
+        parsed = _parse(ALERT_FENCING_NO_FENCING, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.FENCE_EXPECTATION)
+        assert passed is False
+
+    def test_validation_no_alerts_warns(self):
+        engine = RulesEngine()
+        parsed = _parse(ALERT_FENCING_NO_ALERTS, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.NO_ALERTS_EXPECTATION)
+        assert passed is False
+
+    def test_validation_alerts_configured_passes(self):
+        engine = RulesEngine()
+        parsed = _parse(ALERT_FENCING_LIVE_OK, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.NO_ALERTS_EXPECTATION)
+        assert passed is True

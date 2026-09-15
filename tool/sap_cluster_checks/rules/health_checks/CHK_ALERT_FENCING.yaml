@@ -32,5 +32,16 @@ parser:
 
 validation_logic:
   scope: cluster  # Alert config is cluster-wide
-  expectations: []
-  # Informational - alerts are optional but recommended for SAP HANA clusters
+  match_mode: all
+  expectations:
+    - key: fence_config
+      operator: exists
+      message: "No STONITH/fencing configuration found"
+      pass_message: "Fencing: ${fence_config}"
+    - key: no_alerts
+      operator: not_exists
+      severity: WARNING
+      message: "No SAPHanaSR alerts configured (recommended for automatic fence reaction)"
+    - key: alert_config
+      operator: info_if_exists
+      pass_message: "Alert config: ${alert_config}"
