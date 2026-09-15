@@ -384,3 +384,56 @@ class TestCustomMessage:
     def test_default_fail_message(self):
         passed, msg, pass_msg = _evaluate({"key": None}, {"key": "mykey", "operator": "exists"})
         assert "mykey" in msg
+
+
+class TestFailMessageTemplateSubstitution:
+    """Bug #17: fail messages should also resolve ${variable} templates."""
+
+    def test_fail_message_substitutes_variable(self):
+        parsed = {"status": "error"}
+        passed, msg, pass_msg = _evaluate(
+            parsed,
+            {
+                "key": "status",
+                "operator": "in",
+                "value": ["ok"],
+                "message": "Status is ${status}",
+            },
+        )
+        assert passed is False
+        assert msg == "Status is error"
+
+    def test_fail_message_multiple_variables(self):
+        parsed = {"status": "error", "node": "node1"}
+        passed, msg, pass_msg = _evaluate(
+            parsed,
+            {
+                "key": "status",
+                "operator": "in",
+                "value": ["ok"],
+                "message": "${node}: status ${status}",
+            },
+        )
+        assert passed is False
+        assert msg == "node1: status error"
+
+    def test_fail_message_missing_variable_preserved(self):
+        parsed = {"status": "error"}
+        passed, msg, pass_msg = _evaluate(
+            parsed,
+            {
+                "key": "status",
+                "operator": "in",
+                "value": ["ok"],
+                "message": "Status ${status} on ${unknown}",
+            },
+        )
+        assert msg == "Status error on ${unknown}"
+
+    def test_fail_message_without_template_unchanged(self):
+        parsed = {"key": None}
+        passed, msg, pass_msg = _evaluate(
+            parsed,
+            {"key": "key", "operator": "exists", "message": "No templates here"},
+        )
+        assert msg == "No templates here"

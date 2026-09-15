@@ -41,6 +41,7 @@ parser:
 
 validation_logic:
   scope: cluster  # Cluster-wide status, only needs one node
+  match_mode: all
   expectations:
     - key: offline_nodes
       operator: not_exists
@@ -50,3 +51,10 @@ validation_logic:
       operator: exists
       value: true
       message: "No online nodes found - cluster may be down"
+    - key: standby_nodes
+      operator: not_exists
+      severity: WARNING
+      message: "One or more cluster nodes are in STANDBY mode: ${standby_node_list}"
+    - key: standby_node_list
+      operator: info_if_exists
+      pass_message: "Standby nodes: ${standby_node_list}"

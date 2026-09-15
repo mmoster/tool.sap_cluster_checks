@@ -36,3 +36,12 @@ validation_logic:
       operator: exists
       value: true
       message: "No quorum section found in corosync.conf"
+    - key: two_node
+      operator: info_if_exists
+      pass_message: "Quorum: ${two_node}"
+    - key: expected_votes
+      operator: info_if_exists
+      pass_message: "Quorum: ${expected_votes}"
+    - key: wait_for_all
+      operator: info_if_exists
+      pass_message: "Quorum: ${wait_for_all}"

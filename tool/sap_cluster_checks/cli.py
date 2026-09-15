@@ -1475,7 +1475,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
         print("-" * 63)
         print("To use different nodes:  ./sap_cluster_checks.py <node1> <node2>")
-        print("To reset configuration:  ./sap_cluster_checks.py -D")
+        print("To reset local tool config: ./sap_cluster_checks.py -D")
         print("-" * 63)
 
         skip_steps = skip_steps or []

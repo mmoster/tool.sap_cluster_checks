@@ -232,7 +232,7 @@ class InstallStatusMixin:
                 return False, "Unsupported method"
 
             if self.debug:
-                print(f"  [DEBUG] Executing: {full_cmd[:100]}...")
+                print(f"  [DEBUG] Executing: {full_cmd}")
 
             result = subprocess.run(
                 full_cmd,
@@ -307,17 +307,20 @@ class InstallStatusMixin:
         )
         # Parse output even if exit code is non-zero (rpm returns 1 if any package missing)
         if output:
+            lines = output.strip().splitlines()
             for pkg in required_packages:
-                if (
-                    f"{pkg} is not installed" in output
-                    or f"package {pkg} is not installed" in output
-                ):
-                    status["missing_packages"].append(pkg)
-                elif pkg not in output:
+                # Package is installed if any line starts with the package name
+                # (rpm -q outputs "pkg-version" or "package pkg is not installed")
+                installed = any(
+                    line.startswith(f"{pkg}-") and "is not installed" not in line
+                    for line in lines
+                )
+                if not installed:
                     status["missing_packages"].append(pkg)
             # Check if at least one SAP package is installed
             sap_pkg_found = any(
-                pkg in output and f"{pkg} is not installed" not in output for pkg in sap_packages
+                any(line.startswith(f"{pkg}-") and "is not installed" not in line for line in lines)
+                for pkg in sap_packages
             )
             if not sap_pkg_found:
                 status["missing_packages"].append("sap-hana-ha")  # Recommend newer package

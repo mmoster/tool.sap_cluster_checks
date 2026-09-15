@@ -1,0 +1,46 @@
+# CHK_MAINTENANCE_MODE - Detect cluster or node maintenance mode
+#
+# Maintenance mode disables all resource monitoring and automatic recovery.
+# Health check results may be misleading if maintenance mode is active.
+#
+check_id: CHK_MAINTENANCE_MODE
+version: "1.0"
+severity: WARNING
+description: Detect cluster or node maintenance mode
+enabled: true
+
+source_definitions:
+  live_cmd: |
+    echo "=== MAINTENANCE ==="
+    crm_attribute --type crm_config --name maintenance-mode --query 2>/dev/null || echo "maintenance-mode=false"
+    echo "=== NODE_MAINTENANCE ==="
+    crm_mon -1 2>/dev/null | grep -i 'maintenance' || echo "no_node_maintenance"
+    echo "=== CRM_MON ==="
+    crm_mon -1 2>/dev/null | head -5
+  sos_path: "sos_commands/pacemaker/crm_mon_-1"
+
+parser:
+  type: regex
+  multiline: true
+  search_patterns:
+    - name: cluster_maintenance
+      regex: "maintenance-mode\\s*[=:]\\s*(true)"
+      group: 1
+    - name: node_maintenance
+      regex: "(maintenance)"
+      group: 0
+    - name: no_node_maintenance
+      regex: "no_node_maintenance"
+      group: 0
+
+validation_logic:
+  scope: cluster
+  match_mode: all
+  expectations:
+    - key: cluster_maintenance
+      operator: not_exists
+      severity: WARNING
+      message: "Cluster-wide maintenance mode is ACTIVE - automatic recovery is disabled. Health check results may not reflect operational state."
+    - key: node_maintenance
+      operator: info_if_exists
+      pass_message: "Maintenance: ${node_maintenance}"

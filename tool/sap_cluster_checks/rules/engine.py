@@ -477,7 +477,7 @@ class RulesEngine:
                     raw_yaml=data,
                 )
                 self.rules.append(rule)
-                print(f"  [LOAD] {rule.check_id}: {rule.description[:50]}...")
+                print(f"  [LOAD] {rule.check_id}: {rule.description}")
 
             except Exception as e:
                 print(f"  [ERROR] Failed to load {rule_file.name}: {e}")
@@ -866,15 +866,17 @@ class RulesEngine:
                 cluster_type = "Scale-Out"
                 details["inferred_from_hana_topology"] = True
                 message = (
-                    f"Scale-Out configuration "
-                    f"({hdbnsutil_host_count} hosts per site, {node_count} cluster nodes)"
+                    f"Scale-Out configuration inferred from HANA topology "
+                    f"({hdbnsutil_host_count} hosts per site, {node_count} cluster nodes) "
+                    f"- no SAPHana/SAPHanaController CIB resources found"
                 )
             elif hdbnsutil_host_count == 1:
                 cluster_type = "Scale-Up"
                 details["inferred_from_hana_topology"] = True
                 message = (
-                    f"Scale-Up configuration "
-                    f"({node_count} cluster nodes)"
+                    f"Scale-Up configuration inferred from HANA topology "
+                    f"({node_count} cluster nodes) "
+                    f"- no SAPHana/SAPHanaController CIB resources found"
                 )
             else:
                 cluster_type = "Unknown"
@@ -1384,13 +1386,14 @@ class RulesEngine:
 
         actual = parsed.get(key)
 
-        # Support template variables in pass_message: ${key} is replaced with parsed[key]
+        # Support template variables: ${key} is replaced with parsed[key]
+        def replace_var(match):
+            var_name = match.group(1)
+            return str(parsed.get(var_name, f"${{{var_name}}}"))
+
+        if message and "${" in message:
+            message = re.sub(r"\$\{(\w+)\}", replace_var, message)
         if pass_message and "${" in pass_message:
-
-            def replace_var(match):
-                var_name = match.group(1)
-                return str(parsed.get(var_name, f"${{{var_name}}}"))
-
             pass_message = re.sub(r"\$\{(\w+)\}", replace_var, pass_message)
 
         # Handle info_if_exists: always passes, shows message if key exists
@@ -1630,7 +1633,7 @@ class RulesEngine:
                     description=rule.description,
                     status=CheckStatus.ERROR,
                     severity=Severity[rule.severity],
-                    message=f"Failed to get data: {output[:100]}",
+                    message=f"Failed to get data: {output[:500]}",
                     node=node,
                 )
 

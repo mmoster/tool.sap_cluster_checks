@@ -428,3 +428,72 @@ class TestAlertFencing:
         parsed = _parse(ALERT_FENCING_LIVE_OK, self.PARSER)
         passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.NO_ALERTS_EXPECTATION)
         assert passed is True
+
+
+# -- CHK_NODE_STATUS standby detection tests (Bug #13) ──────────────────
+
+NODE_STATUS_WITH_STANDBY = """\
+Node List:
+  * Online: [ node1 node2 ]
+  * Standby: [ node3 ]
+STANDBY_NODE_LIST=node3
+"""
+
+NODE_STATUS_ALL_ONLINE = """\
+Node List:
+  * Online: [ node1 node2 ]
+"""
+
+NODE_STATUS_WITH_OFFLINE = """\
+Node List:
+  * Online: [ node1 ]
+  * OFFLINE: [ node2 ]
+"""
+
+
+class TestNodeStatusStandby:
+    PARSER = {
+        "type": "regex",
+        "multiline": True,
+        "search_patterns": [
+            {"name": "offline_nodes", "regex": "(OFFLINE|Offline:.*\\S)", "group": 0},
+            {"name": "standby_nodes", "regex": "(standby|Standby:.*\\S)", "group": 0},
+            {"name": "online_nodes", "regex": "(Online|online)", "group": 0},
+            {"name": "standby_node_list", "regex": "STANDBY_NODE_LIST=(.*)", "group": 1},
+        ],
+    }
+
+    STANDBY_EXPECTATION = {
+        "key": "standby_nodes",
+        "operator": "not_exists",
+        "severity": "WARNING",
+        "message": "One or more cluster nodes are in STANDBY mode: ${standby_node_list}",
+    }
+
+    def test_parse_standby_detected(self):
+        result = _parse(NODE_STATUS_WITH_STANDBY, self.PARSER)
+        assert result["standby_nodes"] is not None
+        assert result["standby_node_list"] == "node3"
+        assert result["online_nodes"] is not None
+
+    def test_parse_all_online(self):
+        result = _parse(NODE_STATUS_ALL_ONLINE, self.PARSER)
+        assert result["standby_nodes"] is None
+        assert result["online_nodes"] is not None
+
+    def test_validation_standby_warns(self):
+        engine = RulesEngine()
+        parsed = _parse(NODE_STATUS_WITH_STANDBY, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.STANDBY_EXPECTATION)
+        assert passed is False
+        assert "node3" in msg
+
+    def test_validation_no_standby_passes(self):
+        engine = RulesEngine()
+        parsed = _parse(NODE_STATUS_ALL_ONLINE, self.PARSER)
+        passed, msg, pass_msg = engine._evaluate_expectation(parsed, self.STANDBY_EXPECTATION)
+        assert passed is True
+
+    def test_parse_offline_detected(self):
+        result = _parse(NODE_STATUS_WITH_OFFLINE, self.PARSER)
+        assert result["offline_nodes"] is not None

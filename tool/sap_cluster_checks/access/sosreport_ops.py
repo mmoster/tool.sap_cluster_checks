@@ -270,6 +270,9 @@ def configure_sos_sap_extensions(hostname: str, ssh_user: str = "root") -> tuple
 
     Creates /etc/sos/extras.d/sap_hana_ha with commands for collecting
     HANA cluster state, and updates /etc/sos/sos.conf to enable SAP plugins.
+    A backup of sos.conf is created before modification.
+
+    Use remove_sos_sap_extensions() to clean up deployed files.
 
     Returns:
         Tuple (success: bool, message: str)
@@ -398,6 +401,66 @@ fi
             return (False, "Deployment verification failed")
         return (False, f"SSH command failed: {proc.stderr.strip()[:80]}")
 
+    except subprocess.TimeoutExpired:
+        return (False, "Timeout")
+    except Exception as e:
+        return (False, f"Error: {str(e)}")
+
+
+def remove_sos_sap_extensions(hostname: str, ssh_user: str = "root") -> tuple:
+    """
+    Remove SAP HANA HA SOSreport extensions deployed by this tool.
+
+    Removes /etc/sos/extras.d/sap_hana_ha and restores sos.conf backup if present.
+
+    Returns:
+        (success: bool, message: str)
+    """
+    sudo_prefix = "" if ssh_user == "root" else "sudo "
+
+    cleanup_script = f"""
+# Remove the extras.d file
+if [ -f /etc/sos/extras.d/sap_hana_ha ]; then
+    {sudo_prefix}rm -f /etc/sos/extras.d/sap_hana_ha
+    echo "EXTRAS_REMOVED"
+else
+    echo "EXTRAS_NOT_FOUND"
+fi
+
+# Restore sos.conf backup if available
+BACKUP=$(ls -t /etc/sos/sos.conf.bak.* 2>/dev/null | head -1)
+if [ -n "$BACKUP" ]; then
+    {sudo_prefix}cp "$BACKUP" /etc/sos/sos.conf
+    {sudo_prefix}rm -f /etc/sos/sos.conf.bak.*
+    echo "SOS_CONF_RESTORED"
+else
+    echo "NO_BACKUP_FOUND"
+fi
+"""
+
+    try:
+        proc = subprocess.run(
+            [
+                "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+                "-o", "StrictHostKeyChecking=no",
+                f"{ssh_user}@{hostname}", cleanup_script,
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=30,
+            text=True,
+            check=False,
+        )
+        if proc.returncode == 0:
+            output = proc.stdout
+            parts = []
+            if "EXTRAS_REMOVED" in output:
+                parts.append("extras.d removed")
+            if "SOS_CONF_RESTORED" in output:
+                parts.append("sos.conf restored from backup")
+            return (True, ", ".join(parts) if parts else "Nothing to clean up")
+        return (False, f"SSH command failed: {proc.stderr.strip()[:200]}")
     except subprocess.TimeoutExpired:
         return (False, "Timeout")
     except Exception as e:

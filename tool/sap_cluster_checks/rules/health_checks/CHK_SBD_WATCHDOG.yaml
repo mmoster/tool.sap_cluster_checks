@@ -1,0 +1,82 @@
+# CHK_SBD_WATCHDOG - Validate SBD and watchdog configuration
+#
+# SBD (STONITH Block Device) requires a working watchdog timer.
+# This check validates SBD service status, device health, and watchdog module.
+# Only relevant when SBD-based fencing is used (not cloud fence agents).
+#
+check_id: CHK_SBD_WATCHDOG
+version: "1.0"
+severity: CRITICAL
+description: Validate SBD and watchdog configuration
+enabled: true
+optional: true  # Only relevant for SBD-based fencing
+
+source_definitions:
+  live_cmd: |
+    echo "=== SBD_SERVICE ==="
+    systemctl is-active sbd 2>/dev/null || echo "sbd_inactive"
+    echo "=== SBD_CONFIG ==="
+    cat /etc/sysconfig/sbd 2>/dev/null || echo "no_sbd_config"
+    echo "=== SBD_DEVICES ==="
+    sbd -d /dev/watchdog list 2>/dev/null; sbd dump 2>/dev/null | head -20 || echo "no_sbd_devices"
+    echo "=== WATCHDOG ==="
+    lsmod 2>/dev/null | grep -iE 'softdog|watchdog|iTCO_wdt|hpwdt|i6300esb' || echo "no_watchdog_module"
+    ls -la /dev/watchdog 2>/dev/null || echo "no_watchdog_device"
+    echo "=== SBD_STATUS ==="
+    sbd status 2>/dev/null || echo "sbd_status_unavailable"
+  sos_path: "sos_commands/pacemaker/pcs_config"
+
+parser:
+  type: regex
+  multiline: true
+  search_patterns:
+    - name: sbd_active
+      regex: "^active$"
+      group: 0
+    - name: sbd_inactive
+      regex: "sbd_inactive"
+      group: 0
+    - name: sbd_device
+      regex: "SBD_DEVICE=\"?([^\"\\s]+)"
+      group: 1
+    - name: watchdog_device
+      regex: "SBD_WATCHDOG_DEV=\"?([^\"\\s]+)"
+      group: 1
+    - name: watchdog_module
+      regex: "(softdog|iTCO_wdt|hpwdt|i6300esb|watchdog)"
+      group: 1
+    - name: no_watchdog_module
+      regex: "no_watchdog_module"
+      group: 0
+    - name: no_sbd_config
+      regex: "no_sbd_config"
+      group: 0
+    - name: fence_sbd
+      regex: "(fence_sbd|stonith:fence_sbd)"
+      group: 0
+
+validation_logic:
+  scope: per_node  # SBD/watchdog must be checked on each node
+  match_mode: all
+  expectations:
+    - key: no_sbd_config
+      operator: not_exists
+      severity: WARNING
+      message: "No SBD configuration found (/etc/sysconfig/sbd) - SBD fencing not configured on this node"
+    - key: sbd_inactive
+      operator: not_exists
+      severity: WARNING
+      message: "SBD service is not active - SBD fencing will not work"
+    - key: no_watchdog_module
+      operator: not_exists
+      severity: WARNING
+      message: "No watchdog kernel module loaded - SBD requires a watchdog timer (softdog, iTCO_wdt, etc.)"
+    - key: sbd_device
+      operator: info_if_exists
+      pass_message: "SBD device: ${sbd_device}"
+    - key: watchdog_device
+      operator: info_if_exists
+      pass_message: "Watchdog device: ${watchdog_device}"
+    - key: watchdog_module
+      operator: info_if_exists
+      pass_message: "Watchdog module: ${watchdog_module}"

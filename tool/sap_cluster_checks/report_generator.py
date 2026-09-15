@@ -1069,7 +1069,7 @@ def _render_configured_resources(pdf, cluster_info):
         pdf.set_font("Courier", "", 8)
         for rd in resource_discovery[:15]:
             pdf.set_x(10)
-            pdf.multi_cell(0, 4, rd[:100])
+            pdf.multi_cell(0, 4, rd)
         if len(resource_discovery) > 15:
             pdf.set_font("Helvetica", "I", 8)
             pdf.set_x(10)
@@ -1086,7 +1086,7 @@ def _render_configured_resources(pdf, cluster_info):
                 break
             if loc.startswith("resource") or loc.startswith("Resource"):
                 pdf.set_x(10)
-                pdf.multi_cell(0, 3.5, loc[:100])
+                pdf.multi_cell(0, 3.5, loc)
                 shown += 1
         if (
             len(
@@ -1109,7 +1109,7 @@ def _render_configured_resources(pdf, cluster_info):
         pdf.set_font("Courier", "", 8)
         for col in colocation[:10]:
             pdf.set_x(10)
-            pdf.multi_cell(0, 4, col[:100])
+            pdf.multi_cell(0, 4, col)
         pdf.ln(3)
 
     order = constraints.get("order", [])
@@ -1118,7 +1118,7 @@ def _render_configured_resources(pdf, cluster_info):
         pdf.set_font("Courier", "", 8)
         for ord_c in order[:10]:
             pdf.set_x(10)
-            pdf.multi_cell(0, 4, ord_c[:100])
+            pdf.multi_cell(0, 4, ord_c)
         pdf.ln(3)
 
     stonith = resource_config.get("stonith", {})
@@ -1127,7 +1127,7 @@ def _render_configured_resources(pdf, cluster_info):
         pdf.set_font("Courier", "", 8)
         for device in stonith.get("devices", [])[:10]:
             pdf.set_x(10)
-            pdf.multi_cell(0, 4, device[:100])
+            pdf.multi_cell(0, 4, device)
         pdf.ln(3)
 
     pdf.ln(5)
