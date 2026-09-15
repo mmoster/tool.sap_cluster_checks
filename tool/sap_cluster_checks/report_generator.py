@@ -42,8 +42,8 @@ def is_valid_ip(value: str) -> bool:
     return bool(re.match(ipv4_pattern, value) or re.match(ipv6_pattern, value))
 
 
-class RedHatColors:
-    """Red Hat brand colors"""
+class PdfColors:
+    """Red Hat brand colors for PDF reports."""
 
     RED = (204, 0, 0)  # Red Hat Red
     DARK_RED = (163, 0, 0)  # Darker red for headers
@@ -55,9 +55,6 @@ class RedHatColors:
     YELLOW = (236, 178, 0)  # Warning yellow
     ORANGE = (255, 140, 0)  # Incomplete/in-progress orange
     BLUE = (0, 102, 204)  # Link blue
-
-
-PdfColors = RedHatColors
 
 
 class HealthCheckPDF(FPDF):

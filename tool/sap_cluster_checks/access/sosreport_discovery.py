@@ -158,8 +158,6 @@ class SOSReportDiscoveryMixin:
 
         for hostname, sos_path in sosreports.items():
             extras_path = Path(sos_path) / "sos_commands/sos_extras/sap_hana_ha"
-            _saphana_path = Path(sos_path) / "sos_commands/saphana"  # noqa: F841
-
             # Check for extended data: SAPHanaSR-showAttr or HADR data
             # (old-style: single script output, new-style: individual command files)
             has_sr_attr = (

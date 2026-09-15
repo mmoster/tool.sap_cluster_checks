@@ -48,6 +48,7 @@ from .lib.hana_status import HanaStatusMixin
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
 DEFAULT_OUTPUT_DIR = Path.cwd() / "results"
+ESSENTIAL_COMMANDS = ["pacemaker", "corosync", "pcs", "crm_mon"]
 
 
 class Spinner:
@@ -1594,8 +1595,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                     show_config(config_file, cluster_to_show, config_only=True)
 
             # Check for installation issues
-            # Essential commands for RHEL clusters
-            essential_commands = ["pacemaker", "corosync", "pcs", "crm_mon"]  # noqa: F841
+            essential_commands = ESSENTIAL_COMMANDS
             packages_missing = False
             commands_missing = []
             for r in all_results:
@@ -1817,8 +1817,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         has_failures = False
         has_skipped = False
         needs_install = False
-        # Essential commands - if these are missing, installation is needed
-        essential_commands = ["pacemaker", "corosync", "pcs", "crm_mon"]
+        essential_commands = ESSENTIAL_COMMANDS
         if self.check_results:
             for r in self.check_results:
                 status = str(getattr(r, "status", ""))
@@ -2025,7 +2024,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
             ]
 
             # Check for essential package/command not found issues
-            essential_commands = ["pacemaker", "corosync", "pcs", "crm_mon"]
+            essential_commands = ESSENTIAL_COMMANDS
             packages_missing = False
             essential_cmd_missing = False
             for r in all_results:
