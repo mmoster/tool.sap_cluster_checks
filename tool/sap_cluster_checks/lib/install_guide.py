@@ -85,6 +85,8 @@ class InstallGuideMixin:
         print(f"    {status_icon(status['cluster_online'])} All nodes online")
         if status["cluster_nodes"]:
             print(f"        Online: {', '.join(status['cluster_nodes'])}")
+        if status.get("standby_nodes"):
+            print(f"        Standby: {', '.join(status['standby_nodes'])}")
         if status.get("offline_nodes"):
             print(f"        Offline: {', '.join(status['offline_nodes'])}")
 

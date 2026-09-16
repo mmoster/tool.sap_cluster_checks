@@ -1,4 +1,84 @@
-"""Tests for install_status package detection logic (Bug #19)."""
+"""Tests for install_status package detection and node status parsing."""
+
+import re
+
+from tool.sap_cluster_checks.lib.install_checks import make_status_dict
+
+
+def _parse_node_status(output):
+    """Simulate the node status parsing from InstallStatusMixin (SSH path)."""
+    status = make_status_dict("test", "ssh")
+    for category, key in [
+        ("Online", "cluster_nodes"),
+        ("Standby", "standby_nodes"),
+        ("Offline", "offline_nodes"),
+    ]:
+        match = re.search(rf"{category}:\s*\[\s*(.*?)\s*\]", output)
+        if match:
+            status[key] = [n.strip() for n in match.group(1).split() if n.strip()]
+        else:
+            match = re.search(rf"{category}:\s*(.+?)(?:\n|$)", output)
+            if match:
+                status[key] = [
+                    n.strip()
+                    for n in match.group(1).split()
+                    if n.strip() and ":" not in n
+                ]
+    status["cluster_online"] = (
+        bool(status["cluster_nodes"])
+        and not status["standby_nodes"]
+        and not status["offline_nodes"]
+    )
+    return status
+
+
+class TestNodeStatusParsing:
+    """Test node status parsing handles standby/offline nodes correctly."""
+
+    def test_all_nodes_online_bracket_format(self):
+        output = "Pacemaker Nodes:\n Online: [ node1 node2 node3 ]\n"
+        result = _parse_node_status(output)
+        assert result["cluster_online"] is True
+        assert result["cluster_nodes"] == ["node1", "node2", "node3"]
+        assert result["standby_nodes"] == []
+
+    def test_standby_node_bracket_format(self):
+        output = (
+            "Pacemaker Nodes:\n"
+            " Online: [ node1 node2 ]\n"
+            " Standby: [ node3 ]\n"
+        )
+        result = _parse_node_status(output)
+        assert result["cluster_online"] is False
+        assert result["cluster_nodes"] == ["node1", "node2"]
+        assert result["standby_nodes"] == ["node3"]
+
+    def test_standby_node_space_format(self):
+        output = (
+            "Pacemaker Nodes:\n"
+            " Online: node1 node2 node3\n"
+            " Standby: node4 node5\n"
+        )
+        result = _parse_node_status(output)
+        assert result["cluster_online"] is False
+        assert result["cluster_nodes"] == ["node1", "node2", "node3"]
+        assert result["standby_nodes"] == ["node4", "node5"]
+
+    def test_offline_node(self):
+        output = (
+            "Pacemaker Nodes:\n"
+            " Online: [ node1 ]\n"
+            " Offline: [ node2 ]\n"
+        )
+        result = _parse_node_status(output)
+        assert result["cluster_online"] is False
+        assert result["offline_nodes"] == ["node2"]
+
+    def test_no_nodes_online(self):
+        output = "Pacemaker Nodes:\n Offline: [ node1 node2 ]\n"
+        result = _parse_node_status(output)
+        assert result["cluster_online"] is False
+        assert result["cluster_nodes"] == []
 
 
 def _parse_rpm_output(output):

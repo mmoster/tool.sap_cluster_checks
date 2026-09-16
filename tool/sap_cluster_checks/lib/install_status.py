@@ -141,24 +141,45 @@ class InstallStatusMixin:
                     "Cluster name:" in content or "nodes configured" in content
                 )
 
-                # Check for online nodes - handle both formats:
-                # Old format: "Online: [ node1 node2 ]"
-                # New format: "Node nodename (id): online"
+                # Check for online/standby nodes - handle both formats:
+                # Old format: "Online: [ node1 node2 ]", "Standby: [ node3 ]"
+                # New format: "Node nodename (id): online|standby"
                 if "Online:" in content:
-                    status["cluster_online"] = True
                     match = re.search(r"Online:\s*\[\s*(.*?)\s*\]", content)
                     if match:
                         status["cluster_nodes"] = [
                             n.strip() for n in match.group(1).split() if n.strip()
                         ]
+                    standby_match = re.search(r"Standby:\s*\[\s*(.*?)\s*\]", content)
+                    if standby_match:
+                        status["standby_nodes"] = [
+                            n.strip()
+                            for n in standby_match.group(1).split()
+                            if n.strip()
+                        ]
 
-                # New pcs status format: "Node nodename (id): online"
-                node_matches = re.findall(
-                    r"Node\s+(\S+)\s+\(\d+\):\s+online", content, re.IGNORECASE
+                # New pcs status format: "Node nodename (id): online|standby"
+                # Also handles crm_mon format: "Node nodename: online|standby"
+                node_online = re.findall(
+                    r"Node\s+(\S+?)(?:\s+\(\d+\))?:\s+online",
+                    content,
+                    re.IGNORECASE,
                 )
-                if node_matches:
-                    status["cluster_online"] = True
-                    status["cluster_nodes"] = node_matches
+                node_standby = re.findall(
+                    r"Node\s+(\S+?)(?:\s+\(\d+\))?:\s+standby",
+                    content,
+                    re.IGNORECASE,
+                )
+                if node_online:
+                    status["cluster_nodes"] = node_online
+                if node_standby:
+                    status["standby_nodes"] = node_standby
+
+                status["cluster_online"] = (
+                    bool(status.get("cluster_nodes"))
+                    and not status.get("standby_nodes")
+                    and not status.get("offline_nodes")
+                )
 
                 # Check STONITH - look for stonith resources running
                 if "stonith:" in content.lower() and "Started" in content:
@@ -475,23 +496,29 @@ class InstallStatusMixin:
             "pcs status nodes 2>/dev/null", node, method, user
         )
         if success:
-            status["cluster_online"] = "Online:" in output and output.strip() != ""
-            # Extract online nodes - handles both "Online: [ node1 node2 ]" and "Online: node1 node2"
-            # Try bracket format first
-            match = re.search(r"Online:\s*\[\s*(.*?)\s*\]", output)
-            if match:
-                status["cluster_nodes"] = [n.strip() for n in match.group(1).split() if n.strip()]
-            else:
-                # Try space-separated format: "Online: node1 node2"
-                match = re.search(r"Online:\s*(.+?)(?:\n|$)", output)
+            # Parse node categories: Online, Standby, Offline
+            # Handles both "Category: [ node1 node2 ]" and "Category: node1 node2"
+            for category, key in [
+                ("Online", "cluster_nodes"),
+                ("Standby", "standby_nodes"),
+                ("Offline", "offline_nodes"),
+            ]:
+                match = re.search(rf"{category}:\s*\[\s*(.*?)\s*\]", output)
                 if match:
-                    nodes = match.group(1).strip()
-                    # Filter out empty strings and common non-node words
-                    status["cluster_nodes"] = [
-                        n.strip()
-                        for n in nodes.split()
-                        if n.strip() and n.strip() not in ["Standby:", "Offline:", "Maintenance:"]
-                    ]
+                    status[key] = [n.strip() for n in match.group(1).split() if n.strip()]
+                else:
+                    match = re.search(rf"{category}:\s*(.+?)(?:\n|$)", output)
+                    if match:
+                        status[key] = [
+                            n.strip()
+                            for n in match.group(1).split()
+                            if n.strip() and ":" not in n
+                        ]
+            status["cluster_online"] = (
+                bool(status["cluster_nodes"])
+                and not status["standby_nodes"]
+                and not status["offline_nodes"]
+            )
 
         # Check STONITH enabled (default is true if not explicitly set in modern pacemaker)
         success, output = self._execute_check_cmd(

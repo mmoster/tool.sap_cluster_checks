@@ -42,6 +42,7 @@ def make_status_dict(node: str = None, method: str = None) -> dict:
         "method": method,
         "cluster_name": None,
         "cluster_nodes": [],
+        "standby_nodes": [],
         "offline_nodes": [],
         # Version info
         "rhel_version": None,
