@@ -116,12 +116,21 @@ class InstallStatusMixin:
                     "resource-agents-sap-hana-scaleout",
                 ]
 
+                lines = pkg_content.splitlines()
+
+                def _pkg_installed(pkg):
+                    """Match 'pkg-version' (installed-rpms) or 'pkg version' (sysinfo.txt)."""
+                    return any(
+                        line.startswith(f"{pkg}-") or line.startswith(f"{pkg} ")
+                        for line in lines
+                    )
+
                 missing = []
                 for pkg in required_packages:
-                    if pkg not in pkg_content:
+                    if not _pkg_installed(pkg):
                         missing.append(pkg)
 
-                sap_found = any(pkg in pkg_content for pkg in sap_packages)
+                sap_found = any(_pkg_installed(pkg) for pkg in sap_packages)
                 if not sap_found:
                     missing.append("sap-hana-ha")
 
@@ -181,19 +190,23 @@ class InstallStatusMixin:
                     and not status.get("offline_nodes")
                 )
 
-                # Check STONITH - look for stonith resources running
-                if "stonith:" in content.lower() and "Started" in content:
-                    status["stonith_enabled"] = True
-                elif (
-                    "stonith-enabled=true" in content.lower()
-                    or "stonith-enabled: true" in content.lower()
-                ):
-                    status["stonith_enabled"] = True
-                elif (
+                # Check STONITH - property and device status
+                if (
                     "stonith-enabled=false" in content.lower()
                     or "stonith-enabled: false" in content.lower()
                 ):
                     status["stonith_enabled"] = False
+                else:
+                    # Default is true in pacemaker
+                    status["stonith_enabled"] = True
+
+                # Check if a STONITH device is actually configured and running
+                if "stonith:" in content.lower() and "Started" in content:
+                    status["stonith_configured"] = True
+                elif "stonith:" in content.lower():
+                    # Device exists but not started
+                    status["stonith_configured"] = False
+                    status["stonith_disabled"] = True
 
                 # Check HANA resources
                 if "SAPHana" in content:
@@ -530,11 +543,8 @@ class InstallStatusMixin:
             if "false" in output.lower():
                 status["stonith_enabled"] = False
             else:
-                # Check if stonith devices exist (if they do, stonith is effectively enabled)
-                stonith_check, stonith_out = self._execute_check_cmd(
-                    "pcs stonith status 2>/dev/null | grep -E 'Started|Stopped'", node, method, user
-                )
-                status["stonith_enabled"] = stonith_check and stonith_out.strip() != ""
+                # stonith-enabled defaults to true in pacemaker
+                status["stonith_enabled"] = True
 
         # Check STONITH configured and running
         success, output = self._execute_check_cmd(
