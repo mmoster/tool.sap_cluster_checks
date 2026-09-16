@@ -2162,7 +2162,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
 
         print("\n" + "-" * 63)
         print(" Quick: -h help | -i install | -G guide | --suggest | --list-steps")
-        print("-" * 63)
+        print("-" * 63 + "\n")
 
 
 # Note: print_guide(), print_steps(), print_suggestions(), interactive_startup(),
