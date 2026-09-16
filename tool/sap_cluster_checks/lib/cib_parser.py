@@ -215,19 +215,43 @@ class CIBParser:
         result["raw_output"] = output
 
         # Extract SAP HANA configuration
+        import re
+
         lines = output.split("\n")
         current_resource = None
+        current_agent_type = None
 
         for i, line in enumerate(lines):
-            # Detect SAPHana resources
-            if "SAPHanaController" in line or "SAPHanaTopology" in line:
-                # Find resource name from previous lines
-                for j in range(i, max(0, i - 5), -1):
-                    if lines[j].strip().startswith("Clone:") or lines[j].strip().startswith(
-                        "Resource:"
-                    ):
-                        current_resource = lines[j].split(":")[1].strip().split()[0]
-                        break
+            stripped = line.strip()
+
+            # Only trigger on Clone:/Resource: definition lines, not on
+            # Meta Attributes/Operations lines that reference the resource name
+            if stripped.startswith("Clone:") and "SAPHana" in line:
+                if "Filesystem" in line:
+                    # SAPHanaFilesystem - stop capturing
+                    current_resource = None
+                    current_agent_type = None
+                else:
+                    # Clone definition - set current_resource, type comes later
+                    current_resource = stripped.split(":")[1].strip().split()[0]
+                    current_agent_type = None
+            elif stripped.startswith("Resource:") and "SAPHana" in line:
+                # Resource definition - get agent type from type= parameter
+                type_match = re.search(r"type=(SAPHana\w*)", line)
+                if type_match and "Filesystem" not in type_match.group(1):
+                    t = type_match.group(1)
+                    if "Topology" in t:
+                        current_agent_type = "SAPHanaTopology"
+                    elif "Controller" in t:
+                        current_agent_type = "SAPHanaController"
+                    else:
+                        current_agent_type = "SAPHana"
+                    # Keep clone name if already set (attributes span both levels)
+                    if current_resource is None:
+                        current_resource = stripped.split(":")[1].strip().split()[0]
+                    # Update agent type on existing entry
+                    if current_resource in result["sap_hana"]:
+                        result["sap_hana"][current_resource]["_agent_type"] = current_agent_type
 
             # Extract key attributes
             if current_resource and "=" in line:
@@ -245,7 +269,9 @@ class CIBParser:
                     ]
                 ):
                     if current_resource not in result["sap_hana"]:
-                        result["sap_hana"][current_resource] = {}
+                        result["sap_hana"][current_resource] = {
+                            "_agent_type": current_agent_type
+                        }
 
                     # Parse key=value
                     if "=" in line:

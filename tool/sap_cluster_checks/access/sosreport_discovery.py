@@ -497,31 +497,38 @@ class SOSReportDiscoveryMixin:
             if parser and parser.is_available():
                 cib_config = parser.get_resource_config()
                 if cib_config.get("success"):
-                    hana_config = cib_config.get("sap_hana", {})
-                    if hana_config:
-                        config["sid"] = hana_config.get("sid")
-                        config["instance_number"] = hana_config.get("instance_number")
-                        config["resource_name"] = hana_config.get("resource_name")
-                        config["resource_type"] = hana_config.get("resource_type")
-                        config["clone_max"] = hana_config.get("clone_max")
-
-                        # Extract HA parameters from resource attributes
-                        attrs = hana_config.get("attributes", {})
-                        if attrs.get("AUTOMATED_REGISTER"):
-                            config["automated_register"] = (
-                                attrs["AUTOMATED_REGISTER"].lower() == "true"
-                            )
-                        if attrs.get("PREFER_SITE_TAKEOVER"):
-                            config["prefer_site_takeover"] = (
-                                attrs["PREFER_SITE_TAKEOVER"].lower() == "true"
-                            )
-                        if attrs.get("DUPLICATE_PRIMARY_TIMEOUT"):
-                            try:
-                                config["duplicate_primary_timeout"] = int(
-                                    attrs["DUPLICATE_PRIMARY_TIMEOUT"]
+                    # sap_hana is keyed by resource name, each entry has
+                    # _agent_type and parsed key=value attributes
+                    for res_name, res_attrs in cib_config.get("sap_hana", {}).items():
+                        agent_type = res_attrs.get("_agent_type", "")
+                        if agent_type == "SAPHanaTopology":
+                            config["topology_resource"] = res_name
+                        elif agent_type in ("SAPHana", "SAPHanaController"):
+                            config["resource_name"] = res_name
+                            config["resource_type"] = agent_type
+                            config["sid"] = res_attrs.get("SID")
+                            config["instance_number"] = res_attrs.get("InstanceNumber")
+                            clone_max = res_attrs.get("clone-max")
+                            if clone_max:
+                                try:
+                                    config["clone_max"] = int(clone_max)
+                                except ValueError:
+                                    pass
+                            if res_attrs.get("AUTOMATED_REGISTER"):
+                                config["automated_register"] = (
+                                    res_attrs["AUTOMATED_REGISTER"].lower() == "true"
                                 )
-                            except ValueError:
-                                pass
+                            if res_attrs.get("PREFER_SITE_TAKEOVER"):
+                                config["prefer_site_takeover"] = (
+                                    res_attrs["PREFER_SITE_TAKEOVER"].lower() == "true"
+                                )
+                            if res_attrs.get("DUPLICATE_PRIMARY_TIMEOUT"):
+                                try:
+                                    config["duplicate_primary_timeout"] = int(
+                                        res_attrs["DUPLICATE_PRIMARY_TIMEOUT"]
+                                    )
+                                except ValueError:
+                                    pass
 
                 # Get STONITH config
                 stonith_config = parser.get_stonith()
