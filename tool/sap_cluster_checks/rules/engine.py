@@ -732,6 +732,23 @@ class RulesEngine:
                 continue
 
             try:
+                if pattern.get("find_all"):
+                    matches = re.findall(regex, output, flags)
+                    if matches:
+                        # findall with groups returns tuples; collect first non-empty
+                        # group from each match (handles alternation patterns)
+                        if isinstance(matches[0], tuple):
+                            values = []
+                            for m in matches:
+                                val = next((g for g in m if g), None)
+                                if val:
+                                    values.append(val)
+                        else:
+                            values = [m for m in matches if m]
+                        parsed[name] = ", ".join(values) if values else None
+                    else:
+                        parsed[name] = None
+                    continue
                 match = re.search(regex, output, flags)
                 if match:
                     if group == 0:
@@ -1389,7 +1406,10 @@ class RulesEngine:
         # Support template variables: ${key} is replaced with parsed[key]
         def replace_var(match):
             var_name = match.group(1)
-            return str(parsed.get(var_name, f"${{{var_name}}}"))
+            val = parsed.get(var_name)
+            if val is None:
+                return ""
+            return str(val)
 
         if message and "${" in message:
             message = re.sub(r"\$\{(\w+)\}", replace_var, message)

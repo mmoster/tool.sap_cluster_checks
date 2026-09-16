@@ -151,6 +151,80 @@ class TestRegexPatterns:
         assert result["status_line"] == "status: active"
 
 
+class TestFindAll:
+    """Test find_all parser option."""
+
+    def test_find_all_simple(self):
+        output = "Node dc2hana1 (3): standby\nNode dc2hana2 (4): standby\n"
+        config = {
+            "type": "regex",
+            "multiline": True,
+            "search_patterns": [
+                {
+                    "name": "nodes",
+                    "regex": r"Node\s+(\S+)[^:]*:\s*standby",
+                    "group": 1,
+                    "find_all": True,
+                },
+            ],
+        }
+        result = _parse(output, config)
+        assert result["nodes"] == "dc2hana1, dc2hana2"
+
+    def test_find_all_alternation(self):
+        """find_all with alternation picks first non-empty group from each match."""
+        output = "Node dc2hana1 (3): standby\nNode dc2hana2 (4): standby\n"
+        config = {
+            "type": "regex",
+            "multiline": True,
+            "search_patterns": [
+                {
+                    "name": "nodes",
+                    "regex": r"(?:STANDBY_NODE_LIST=(\S+)|Node\s+(\S+)[^:]*:\s*standby)",
+                    "group": 1,
+                    "find_all": True,
+                },
+            ],
+        }
+        result = _parse(output, config)
+        assert result["nodes"] == "dc2hana1, dc2hana2"
+
+    def test_find_all_standby_node_list_format(self):
+        """find_all with STANDBY_NODE_LIST= format (from live_cmd)."""
+        output = "Online: node1\nSTANDBY_NODE_LIST=dc2hana1,dc2hana2\n"
+        config = {
+            "type": "regex",
+            "multiline": True,
+            "search_patterns": [
+                {
+                    "name": "nodes",
+                    "regex": r"(?:STANDBY_NODE_LIST=(\S+)|Node\s+(\S+)[^:]*:\s*standby)",
+                    "group": 1,
+                    "find_all": True,
+                },
+            ],
+        }
+        result = _parse(output, config)
+        assert result["nodes"] == "dc2hana1,dc2hana2"
+
+    def test_find_all_no_match_returns_none(self):
+        output = "Online: node1 node2\n"
+        config = {
+            "type": "regex",
+            "multiline": True,
+            "search_patterns": [
+                {
+                    "name": "nodes",
+                    "regex": r"Node\s+(\S+)[^:]*:\s*standby",
+                    "group": 1,
+                    "find_all": True,
+                },
+            ],
+        }
+        result = _parse(output, config)
+        assert result["nodes"] is None
+
+
 class TestHanaResourceTypeDetection:
     """Verify CHK_CLUSTER_TYPE parser patterns match agent types, not just resource names."""
 
@@ -158,9 +232,9 @@ class TestHanaResourceTypeDetection:
         "type": "regex",
         "multiline": True,
         "search_patterns": [
-            {"name": "saphana_resource", "regex": r"(SAPHana[_):\s][^A-Za-z])", "group": 0},
-            {"name": "saphana_controller", "regex": r"(SAPHanaController)", "group": 0},
-            {"name": "saphana_topology", "regex": r"(SAPHanaTopology)", "group": 0},
+            {"name": "saphana_resource", "regex": r"(SAPHana[_):\s])", "group": 0},
+            {"name": "saphana_controller", "regex": r"(SAPHanaCon)", "group": 0},
+            {"name": "saphana_topology", "regex": r"(SAPHanaTop)", "group": 0},
         ],
     }
 
@@ -190,6 +264,17 @@ class TestHanaResourceTypeDetection:
         assert result["saphana_controller"] is not None, "SAPHanaController not detected from agent type"
         assert result["saphana_topology"] is not None, "SAPHanaTopology not detected from agent type"
 
+    def test_abbreviated_names_status_output(self):
+        """Abbreviated names in pcs resource status (no type= field)."""
+        output = (
+            "  * Clone Set: cln_SAPHanaCon_RH1_HDB02 [rsc_SAPHanaCon_RH1_HDB02] (promotable):\n"
+            "  * Clone Set: cln_SAPHanaTop_RH1_HDB02 [rsc_SAPHanaTop_RH1_HDB02]:\n"
+        )
+        result = _parse(output, self.CLUSTER_TYPE_PATTERNS)
+        assert result["saphana_controller"] is not None, "Abbreviated SAPHanaCon not detected"
+        assert result["saphana_topology"] is not None, "Abbreviated SAPHanaTop not detected"
+        assert result["saphana_resource"] is None, "Should not false-positive on SAPHanaCon"
+
     def test_legacy_saphana_type(self):
         """Legacy naming: SAPHana_S4D_HDB00 (resource agent type is SAPHana, not SAPHanaController)."""
         output = (
@@ -198,7 +283,7 @@ class TestHanaResourceTypeDetection:
         )
         result = _parse(output, self.CLUSTER_TYPE_PATTERNS)
         assert result["saphana_resource"] is not None, "Legacy SAPHana not detected"
-        assert result["saphana_controller"] is None, "Should not match SAPHanaController"
+        assert result["saphana_controller"] is None, "Should not match SAPHanaCon"
 
     def test_legacy_saphana_custom_name(self):
         """Legacy SAPHana with custom resource name - detected by agent type."""

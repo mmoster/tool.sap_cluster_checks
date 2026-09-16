@@ -36,8 +36,10 @@ parser:
       regex: "(Online|online)"
       group: 0
     - name: standby_node_list
-      regex: "STANDBY_NODE_LIST=(.*)"
+      # live_cmd produces STANDBY_NODE_LIST=...; crm_mon has per-node "Node X (id): standby"
+      regex: "(?:STANDBY_NODE_LIST=(\\S+)|Node\\s+(\\S+)[^:]*:\\s*standby)"
       group: 1
+      find_all: true
 
 validation_logic:
   scope: cluster  # Cluster-wide status, only needs one node

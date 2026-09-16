@@ -132,16 +132,16 @@ parser:
       group: 0
     - name: saphana_resource
       # Match legacy SAPHana agent by type (ocf:...:SAPHana) or name (SAPHana_*)
-      # Must NOT match SAPHanaController/SAPHanaTopology/SAPHanaFilesystem
-      regex: "(SAPHana[_):\\s][^A-Za-z])"
+      # Must NOT match SAPHanaController/SAPHanaCon/SAPHanaTopology/SAPHanaTop/SAPHanaFilesystem
+      regex: "(SAPHana[_):\\s])"
       group: 0
     - name: saphana_controller
-      # Match SAPHanaController by agent type or resource name
-      regex: "(SAPHanaController)"
+      # Match SAPHanaController by agent type or abbreviated resource name (SAPHanaCon_*)
+      regex: "(SAPHanaCon)"
       group: 0
     - name: saphana_topology
-      # Match SAPHanaTopology by agent type or resource name
-      regex: "(SAPHanaTopology)"
+      # Match SAPHanaTopology by agent type or abbreviated resource name (SAPHanaTop_*)
+      regex: "(SAPHanaTop)"
       group: 0
     - name: clone_max
       regex: "clone-max[=:\"].*?(\\d+)"
