@@ -18,11 +18,12 @@ parser:
   search_patterns:
     - name: promoted_count
       # Match: "Masters: [ node ]", "Promoted: [ node ]", "Promoted node", "PROMOTED"
-      regex: "(Masters:\\s*\\[|Promoted:\\s*\\[|Promoted\\s+\\S|PROMOTED)"
+      # Use [ \t] instead of \s to avoid crossing newlines in per-node crm_mon format
+      regex: "(Masters:[ \t]*\\[|Promoted:[ \t]*\\[|Promoted[ \t]+\\S|PROMOTED)"
       group: 0
     - name: unpromoted_count
       # Match: "Slaves: [ node ]", "Unpromoted: [ node ]", "Unpromoted node", "DEMOTED"
-      regex: "(Slaves:\\s*\\[|Unpromoted:\\s*\\[|Unpromoted\\s+\\S|DEMOTED)"
+      regex: "(Slaves:[ \t]*\\[|Unpromoted:[ \t]*\\[|Unpromoted[ \t]+\\S|DEMOTED)"
       group: 0
     - name: no_role
       regex: "(Stopped|no role|unknown)"

@@ -50,9 +50,10 @@ parser:
   multiline: true
   search_patterns:
     - name: majority_maker_node
-      # Captures "majority_maker_node=<hostname>" from detection output
-      regex: "majority_maker_node=(\\S+)"
+      # live_cmd: "majority_maker_node=<hostname>"; SOSreport pcs_config: "avoids node '<hostname>'"
+      regex: "(?:majority_maker_node=(\\S+)|avoids node '([^']+)')"
       group: 1
+      find_all: true
     - name: detection_method
       regex: "detection_method=(\\S+)"
       group: 1

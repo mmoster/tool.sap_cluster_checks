@@ -18,28 +18,31 @@ source_definitions:
     echo "=== HANA_RESOURCES ===" && pcs resource show 2>/dev/null | grep -E 'SAPHana|SAPHanaController|SAPHanaTopology' || crm_mon -1 2>/dev/null | grep -E 'SAPHana|SAPHanaController' || cat /var/lib/pacemaker/cib/cib.xml 2>/dev/null | grep -oE 'SAPHana[^"]*' | head -1;
     echo "=== CLONE_MAX ===" && (pcs resource config 2>/dev/null | grep -B10 -A10 'SAPHanaController\|type=SAPHana[^A-Za-z]\|SAPHana_' | grep -E 'clone-max' | head -1 || cat /var/lib/pacemaker/cib/cib.xml 2>/dev/null | grep -oE 'clone-max.*value="[0-9]+"' | grep -oE '[0-9]+' | head -1 | sed 's/^/clone-max=/') || echo "clone-max=2";
     echo "=== MAJORITY_MAKER ===";
-    # Detect majority maker by: 1) name pattern, 2) location constraints excluding BOTH SAPHanaTopology AND SAPHanaController
-    # A node is a majority maker ONLY if BOTH resources are excluded from it (not just app servers)
+    # Detect majority maker by: 1) name pattern, 2) resource pattern constraint, 3) per-resource constraints
     MM_BY_NAME=$(crm_node -l 2>/dev/null | grep -iE 'majority|mm-' | awk '{print $2}');
-    # Find clone resource names by agent type (handles custom resource naming)
-    CONTROLLER_CLONE=$(pcs resource config 2>/dev/null | grep -B5 'type=SAPHanaController' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
-    TOPOLOGY_CLONE=$(pcs resource config 2>/dev/null | grep -B5 'type=SAPHanaTopology' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
-    # Use 'pcs constraint location config' (pcs 0.12+) or 'pcs constraint location show' (older)
     MM_CONSTRAINT_OUTPUT=$(pcs constraint location config 2>/dev/null || pcs constraint location show 2>/dev/null);
-    # Search constraints by clone name (found dynamically above) or by type name (backward compat)
-    CONTROLLER_PAT="${CONTROLLER_CLONE:-SAPHanaController}";
-    TOPOLOGY_PAT="${TOPOLOGY_CLONE:-SAPHanaTopology}";
-    MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$CONTROLLER_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
-    MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$TOPOLOGY_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+    # Method 1: resource pattern constraint (e.g., "resource pattern '.*SAPHana.*' avoids node 'dc3mm'")
+    MM_BY_PATTERN=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "resource pattern.*SAPHana.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | head -1);
     MM_BY_CONSTRAINT="";
-    for node in $MM_CONTROLLER; do
-      if echo "$MM_TOPOLOGY" | grep -qx "$node"; then
-        MM_BY_CONSTRAINT="$node";
-        break;
-      fi;
-    done;
+    if [ -z "$MM_BY_PATTERN" ]; then
+      # Method 2: per-resource constraints (need BOTH controller and topology excluded)
+      CONTROLLER_CLONE=$(pcs resource config 2>/dev/null | grep -B5 'type=SAPHanaController' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
+      TOPOLOGY_CLONE=$(pcs resource config 2>/dev/null | grep -B5 'type=SAPHanaTopology' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
+      CONTROLLER_PAT="${CONTROLLER_CLONE:-SAPHanaController}";
+      TOPOLOGY_PAT="${TOPOLOGY_CLONE:-SAPHanaTopology}";
+      MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$CONTROLLER_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+      MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$TOPOLOGY_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
+      for node in $MM_CONTROLLER; do
+        if echo "$MM_TOPOLOGY" | grep -qx "$node"; then
+          MM_BY_CONSTRAINT="$node";
+          break;
+        fi;
+      done;
+    fi;
     if [ -n "$MM_BY_NAME" ]; then
       echo "majority_maker_node=$MM_BY_NAME (by name)";
+    elif [ -n "$MM_BY_PATTERN" ]; then
+      echo "majority_maker_node=$MM_BY_PATTERN (by constraint)";
     elif [ -n "$MM_BY_CONSTRAINT" ]; then
       echo "majority_maker_node=$MM_BY_CONSTRAINT (by constraint)";
     else
@@ -97,26 +100,25 @@ source_definitions:
     echo "=== CLONE_MAX ===";
     pcs -f {file} resource config 2>/dev/null | grep -B10 -A10 'SAPHanaController\|type=SAPHana[^A-Za-z]\|SAPHana_' | grep -E 'clone-max' | head -1 || echo "clone-max=2";
     echo "=== MAJORITY_MAKER ===";
-    # Detect majority maker by location constraints excluding SAPHanaTopology AND SAPHanaController
-    # A node is a majority maker ONLY if BOTH resources are excluded from it
-    # Find clone resource names by agent type (handles custom resource naming)
-    CONTROLLER_CLONE=$(pcs -f {file} resource config 2>/dev/null | grep -B5 'type=SAPHanaController' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
-    TOPOLOGY_CLONE=$(pcs -f {file} resource config 2>/dev/null | grep -B5 'type=SAPHanaTopology' | grep -oE 'Clone:\s*\S+' | awk '{print $2}' | head -1);
-    # Use 'pcs constraint location config' (pcs 0.12+) or 'pcs constraint location show' (older)
+    # Detect majority maker by location constraints excluding SAPHana resources from a node
     MM_CONSTRAINT_OUTPUT=$(pcs -f {file} constraint location config 2>/dev/null || pcs -f {file} constraint location show 2>/dev/null);
-    # Search constraints by clone name (found dynamically above) or by type name (backward compat)
-    CONTROLLER_PAT="${CONTROLLER_CLONE:-SAPHanaController}";
-    TOPOLOGY_PAT="${TOPOLOGY_CLONE:-SAPHanaTopology}";
-    MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$CONTROLLER_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
-    MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$TOPOLOGY_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\([^']*\)'.*/\1/" | sort -u);
-    # Majority maker = node that appears in BOTH lists (has constraints for both resources)
-    MM="";
-    for node in $MM_CONTROLLER; do
-      if echo "$MM_TOPOLOGY" | grep -qx "$node"; then
-        MM="$node";
-        break;
-      fi;
-    done;
+    # Method 1: resource pattern constraint (e.g., "resource pattern '.*SAPHana.*' avoids node 'dc3mm'")
+    MM=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "resource pattern.*SAPHana.*avoids node.*INFINITY" | sed "s/.*avoids node '\\([^']*\\)'.*/\\1/" | head -1);
+    if [ -z "$MM" ]; then
+      # Method 2: per-resource constraints (need BOTH controller and topology excluded)
+      CONTROLLER_CLONE=$(pcs -f {file} resource config 2>/dev/null | grep -B5 'type=SAPHanaController' | grep -oE 'Clone:\\s*\\S+' | awk '{print $2}' | head -1);
+      TOPOLOGY_CLONE=$(pcs -f {file} resource config 2>/dev/null | grep -B5 'type=SAPHanaTopology' | grep -oE 'Clone:\\s*\\S+' | awk '{print $2}' | head -1);
+      CONTROLLER_PAT="${CONTROLLER_CLONE:-SAPHanaController}";
+      TOPOLOGY_PAT="${TOPOLOGY_CLONE:-SAPHanaTopology}";
+      MM_CONTROLLER=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$CONTROLLER_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\\([^']*\\)'.*/\\1/" | sort -u);
+      MM_TOPOLOGY=$(echo "$MM_CONSTRAINT_OUTPUT" | grep -E "$TOPOLOGY_PAT.*avoids node.*INFINITY" | sed "s/.*avoids node '\\([^']*\\)'.*/\\1/" | sort -u);
+      for node in $MM_CONTROLLER; do
+        if echo "$MM_TOPOLOGY" | grep -qx "$node"; then
+          MM="$node";
+          break;
+        fi;
+      done;
+    fi;
     if [ -n "$MM" ]; then echo "majority_maker_node=$MM (by constraint)"; else echo "none"; fi
   sos_cmd_file: "sos_commands/pacemaker/crm_report/*/cib.xml"
 
@@ -150,9 +152,10 @@ parser:
       regex: "(majority|qdevice|Majority)"
       group: 0
     - name: majority_maker_node
-      # Captures "majority_maker_node=<hostname>" from detection output
-      regex: "majority_maker_node=(\\S+)"
+      # live_cmd: "majority_maker_node=<hostname>"; SOSreport pcs_config: "avoids node '<hostname>'"
+      regex: "(?:majority_maker_node=(\\S+)|avoids node '([^']+)')"
       group: 1
+      find_all: true
     # Parse hdbnsutil -sr_state output for host count per site
     # site_<NAME>_hosts=<count> from HOSTS_PER_SITE section
     - name: site_hosts_count

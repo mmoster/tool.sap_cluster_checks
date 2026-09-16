@@ -697,7 +697,7 @@ class RulesEngine:
             if matches:
                 # Use first matching file
                 try:
-                    with open(matches[0], "r", encoding="utf-8") as f:
+                    with open(matches[0], "r", encoding="utf-8", errors="replace") as f:
                         return True, f.read()
                 except Exception as e:
                     return False, str(e)
@@ -706,7 +706,7 @@ class RulesEngine:
         file_path = node_sos / sos_path
         if file_path.exists():
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
+                with open(file_path, "r", encoding="utf-8", errors="replace") as f:
                     return True, f.read()
             except Exception as e:
                 return False, str(e)

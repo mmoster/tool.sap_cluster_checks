@@ -225,6 +225,121 @@ class TestFindAll:
         assert result["nodes"] is None
 
 
+class TestMajorityMakerNode:
+    """Test majority_maker_node extraction from both live_cmd and SOSreport formats."""
+
+    MM_PATTERNS = {
+        "type": "regex",
+        "multiline": True,
+        "search_patterns": [
+            {
+                "name": "majority_maker_node",
+                "regex": r"(?:majority_maker_node=(\S+)|avoids node '([^']+)')",
+                "group": 1,
+                "find_all": True,
+            },
+        ],
+    }
+
+    def test_live_cmd_format(self):
+        output = "majority_maker_node=dc3mm (by constraint)\n"
+        result = _parse(output, self.MM_PATTERNS)
+        assert result["majority_maker_node"] == "dc3mm"
+
+    def test_sosreport_avoids_node_format(self):
+        output = "resource pattern '.*SAPHana.*' avoids node 'dc3mm' with score INFINITY\n"
+        result = _parse(output, self.MM_PATTERNS)
+        assert result["majority_maker_node"] == "dc3mm"
+
+    def test_no_majority_maker(self):
+        output = "none\n"
+        result = _parse(output, self.MM_PATTERNS)
+        assert result["majority_maker_node"] is None
+
+
+class TestPromotedRolesPatterns:
+    """Test CHK_PROMOTED_ROLES regex doesn't cross newlines."""
+
+    PROMOTED_PATTERNS = {
+        "type": "regex",
+        "multiline": True,
+        "search_patterns": [
+            {
+                "name": "promoted_count",
+                "regex": r"(Masters:[ \t]*\[|Promoted:[ \t]*\[|Promoted[ \t]+\S|PROMOTED)",
+                "group": 0,
+            },
+            {
+                "name": "unpromoted_count",
+                "regex": r"(Slaves:[ \t]*\[|Unpromoted:[ \t]*\[|Unpromoted[ \t]+\S|DEMOTED)",
+                "group": 0,
+            },
+        ],
+    }
+
+    def test_per_node_format_no_newline_crossing(self):
+        """Per-node crm_mon: 'Promoted' at end of line must not capture next line."""
+        output = (
+            "  * cln_SAPHanaCon_RH1_HDB02 [rsc_SAPHanaCon_RH1_HDB02] (promotable):\n"
+            "    * Promoted:\n"
+            "      * rsc_SAPHanaCon_RH1_HDB02 dc1hana1\n"
+            "    * Unpromoted:\n"
+            "      * rsc_SAPHanaCon_RH1_HDB02 dc1hana2\n"
+        )
+        result = _parse(output, self.PROMOTED_PATTERNS)
+        # Should match "Promoted:" or not at all - must NOT capture "Promoted\n      *"
+        if result["promoted_count"] is not None:
+            assert "\n" not in result["promoted_count"]
+
+    def test_inline_promoted_node(self):
+        """Inline format: 'Promoted node1' on same line."""
+        output = "    * rsc_SAPHanaCon (ocf:heartbeat:SAPHanaController): Promoted node1\n"
+        result = _parse(output, self.PROMOTED_PATTERNS)
+        assert result["promoted_count"] is not None
+        assert "\n" not in result["promoted_count"]
+
+    def test_bracket_format(self):
+        """Bracket format: 'Promoted: [ node1 ]'."""
+        output = "    * Promoted: [ dc1hana1 ]\n    * Unpromoted: [ dc1hana2 ]\n"
+        result = _parse(output, self.PROMOTED_PATTERNS)
+        assert result["promoted_count"] is not None
+        assert result["unpromoted_count"] is not None
+
+
+class TestResourceDisabledPattern:
+    """Test CHK_RESOURCE_STATUS resource_disabled doesn't false-positive on VIP resources."""
+
+    DISABLED_PATTERNS = {
+        "type": "regex",
+        "multiline": True,
+        "search_patterns": [
+            {
+                "name": "resource_disabled",
+                "regex": r"(target-role.*Stopped|SAPHana.*disabled|disabled.*SAPHana)",
+                "group": 0,
+            },
+        ],
+    }
+
+    def test_vip_disabled_no_match(self):
+        """VIP 'Stopped (disabled)' must NOT trigger resource_disabled."""
+        output = "  * rsc_vip_RH1 (ocf:heartbeat:IPaddr2): Stopped (disabled)\n"
+        result = _parse(output, self.DISABLED_PATTERNS)
+        assert result["resource_disabled"] is None
+
+    def test_hana_target_role_stopped(self):
+        """target-role=Stopped should still match."""
+        output = "  Meta Attrs: target-role=Stopped\n"
+        result = _parse(output, self.DISABLED_PATTERNS)
+        assert result["resource_disabled"] is not None
+
+    def test_hana_resource_disabled(self):
+        """SAPHana disabled should match."""
+        output = "  * SAPHanaController_S4D (ocf:heartbeat:SAPHanaController): Stopped (disabled)\n"
+        result = _parse(output, self.DISABLED_PATTERNS)
+        assert result["resource_disabled"] is not None
+
+
 class TestHanaResourceTypeDetection:
     """Verify CHK_CLUSTER_TYPE parser patterns match agent types, not just resource names."""
 

@@ -68,7 +68,8 @@ parser:
       regex: "(Started|Master|Slave|Promoted|running)"
       group: 0
     - name: resource_disabled
-      regex: "(target-role.*Stopped|Stopped.*disabled|disabled)"
+      # Only match HANA-specific disable patterns, not VIP "Stopped (disabled)"
+      regex: "(target-role.*Stopped|SAPHana.*disabled|disabled.*SAPHana)"
       group: 0
     - name: resource_unmanaged
       regex: "(unmanaged)"

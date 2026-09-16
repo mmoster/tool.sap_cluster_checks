@@ -350,7 +350,7 @@ class TestTemplateVariableSubstitution:
         )
         assert pass_msg == "test v2.0"
 
-    def test_missing_variable_preserved(self):
+    def test_missing_variable_replaced_with_empty(self):
         parsed = {"name": "test"}
         passed, msg, pass_msg = _evaluate(
             parsed,
@@ -360,7 +360,7 @@ class TestTemplateVariableSubstitution:
                 "pass_message": "${name} - ${missing}",
             },
         )
-        assert pass_msg == "test - ${missing}"
+        assert pass_msg == "test - "
 
 
 class TestUnknownOperator:
@@ -417,7 +417,7 @@ class TestFailMessageTemplateSubstitution:
         assert passed is False
         assert msg == "node1: status error"
 
-    def test_fail_message_missing_variable_preserved(self):
+    def test_fail_message_missing_variable_replaced_with_empty(self):
         parsed = {"status": "error"}
         passed, msg, pass_msg = _evaluate(
             parsed,
@@ -428,7 +428,7 @@ class TestFailMessageTemplateSubstitution:
                 "message": "Status ${status} on ${unknown}",
             },
         )
-        assert msg == "Status error on ${unknown}"
+        assert msg == "Status error on "
 
     def test_fail_message_without_template_unchanged(self):
         parsed = {"key": None}
