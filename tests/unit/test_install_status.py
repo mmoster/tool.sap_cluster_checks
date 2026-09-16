@@ -17,7 +17,7 @@ def _parse_node_status(output):
         if match:
             status[key] = [n.strip() for n in match.group(1).split() if n.strip()]
         else:
-            match = re.search(rf"{category}:\s*(.+?)(?:\n|$)", output)
+            match = re.search(rf"{category}:[ \t]*(.+?)(?:\n|$)", output)
             if match:
                 status[key] = [
                     n.strip()
@@ -79,6 +79,29 @@ class TestNodeStatusParsing:
         result = _parse_node_status(output)
         assert result["cluster_online"] is False
         assert result["cluster_nodes"] == []
+
+    def test_empty_standby_not_parsed_as_nodes(self):
+        """Regression: empty Standby/Offline must not cross newlines into
+        'Standby with resource(s)...' or 'Pacemaker Remote Nodes:' headers."""
+        output = (
+            "Pacemaker Nodes:\n"
+            " Online: dc1hana1 dc1hana2 dc2hana1 dc2hana2 dc3mm\n"
+            " Standby:\n"
+            " Standby with resource(s) running on them:\n"
+            " Maintenance:\n"
+            " Offline:\n"
+            "Pacemaker Remote Nodes:\n"
+            " Online:\n"
+            " Standby:\n"
+            " Standby with resource(s) running on them:\n"
+            " Maintenance:\n"
+            " Offline:\n"
+        )
+        result = _parse_node_status(output)
+        assert result["cluster_online"] is True
+        assert result["cluster_nodes"] == ["dc1hana1", "dc1hana2", "dc2hana1", "dc2hana2", "dc3mm"]
+        assert result["standby_nodes"] == []
+        assert result["offline_nodes"] == []
 
 
 def _parse_rpm_output(output):

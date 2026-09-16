@@ -520,7 +520,9 @@ class InstallStatusMixin:
                 if match:
                     status[key] = [n.strip() for n in match.group(1).split() if n.strip()]
                 else:
-                    match = re.search(rf"{category}:\s*(.+?)(?:\n|$)", output)
+                    # [ \t]* instead of \s* to avoid crossing newlines into
+                    # "Standby with resource(s)..." or "Pacemaker Remote Nodes:"
+                    match = re.search(rf"{category}:[ \t]*(.+?)(?:\n|$)", output)
                     if match:
                         status[key] = [
                             n.strip()
