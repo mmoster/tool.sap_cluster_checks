@@ -450,8 +450,9 @@ COMMON ISSUES & SOLUTIONS
 
   4. Node in Standby
      - A standby node is intentional (e.g., maintenance) or accidental
-     - Check: pcs status nodes
-     - Remove standby: pcs node unstandby <node>
+     - Check:     pcs status nodes
+     - Remediate: pcs node unstandby <node>
+     - Re-check:  ./sap_cluster_checks.py
      - Impact: Pacemaker stops managing resources on that node. HANA checks
        (SR detail, process status, landscape) are skipped on standby nodes.
        Promoted/site role checks report WARNING instead of CRITICAL since
@@ -528,8 +529,9 @@ COMMON ISSUES & SOLUTIONS
   4. Missing Unpromoted/Secondary (Node in Standby)
      - If a node is in standby, the secondary HANA instance is expected
        to be missing. This is reported as WARNING, not CRITICAL.
-     - Check: pcs status nodes
-     - Resolve: pcs node unstandby <node>
+     - Check:     pcs status nodes
+     - Remediate: pcs node unstandby <node>
+     - Re-check:  ./sap_cluster_checks.py
      - After unstandby, Pacemaker will re-manage the HANA resource and
        System Replication should resume automatically.
 
