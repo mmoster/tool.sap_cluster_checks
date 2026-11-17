@@ -175,7 +175,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         self.generate_pdf = generate_pdf
         self.majority_makers = []  # Nodes that are majority makers (Scale-Out)
         self.last_pdf_file = None  # Track last generated PDF for auto-open
-        self._hana_resource_state = "unknown"  # running/stopped/disabled/unmanaged/maintenance/absent
+        self._hana_resource_state = "unknown"  # running/partially_running/stopped/disabled/unmanaged/maintenance/absent
         self._hana_installed = False  # Whether HANA is installed on any node
         self._hana_db_status = {}  # HANA DB status and replication info
         self._detected_topology = None  # 'Scale-Up' or 'Scale-Out'
@@ -197,7 +197,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         # so gate results reflect current state when _run_step evaluates them.
         self._gate_registry = GateRegistry()
         self._gate_registry.register(
-            "hana_resource_running", lambda: self._hana_resource_state == "running"
+            "hana_resource_running",
+            lambda: self._hana_resource_state in ("running", "partially_running"),
         )
         self._gate_registry.register("hana_installed", lambda: self._hana_installed)
         self._gate_registry.register(
@@ -1223,7 +1224,7 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         """
         if not self._standby_nodes:
             return
-        if self._hana_resource_state != "running":
+        if self._hana_resource_state not in ("running", "partially_running"):
             return
 
         # Collect nodes where HANA processes are running
@@ -1290,6 +1291,11 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         if parsed.get("resource_unmanaged") is not None:
             return "unmanaged"
         if parsed.get("resource_started") is not None:
+            # Check if some HANA clone instances are also stopped
+            if parsed.get("resource_stopped") is not None:
+                # Exclude intentionally disabled resources
+                if parsed.get("resource_disabled") is None:
+                    return "partially_running"
             return "running"
         if parsed.get("resource_disabled") is not None:
             return "disabled"

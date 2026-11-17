@@ -34,7 +34,7 @@ class HanaStatusMixin:
                     cluster_running = False
                     break
 
-        hana_resource_active = self._hana_resource_state == "running"
+        hana_resource_active = self._hana_resource_state in ("running", "partially_running")
 
         # Determine HANA managed state:
         # Managed = cluster is running AND resource is started/running

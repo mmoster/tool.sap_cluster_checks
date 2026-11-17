@@ -1,7 +1,8 @@
 # CHK_RESOURCE_STATUS - Verify SAP HANA resources are running
 #
 # Detects resource states:
-#   - running: Resource is active with Promoted/Unpromoted roles
+#   - running: All clone instances are active with Promoted/Unpromoted roles
+#   - partially_running: Some instances running, others stopped (e.g., secondary site down)
 #   - stopped: Resource is stopped (may be due to failure or manual stop)
 #   - disabled: Resource is intentionally disabled (target-role=Stopped)
 #   - unmanaged: Resource is set to unmanaged (is-managed=false)
@@ -13,7 +14,7 @@
 # intentionally stopped during maintenance.
 #
 check_id: CHK_RESOURCE_STATUS
-version: "2.1"
+version: "2.2"
 severity: CRITICAL
 description: Verify SAP HANA cluster resources are running
 enabled: true
@@ -26,17 +27,21 @@ source_definitions:
     # IMPORTANT: Only check HANA resource lines, not the full output.
     # Other resources (ERS, AAS groups) may be disabled without affecting HANA.
     # Extract HANA resource lines AND their child status lines (Masters/Slaves/Started/Stopped)
-    # Use grep -A2 to capture the 2 lines after each SAPHana match (clone children)
-    HANA_LINES=$(echo "$OUTPUT" | grep -iE -A2 'SAPHana|SAPHanaController|rsc_SAPHana')
+    # Use grep -A5 to capture child lines (Scale-Out clones can have 4+ child lines)
+    HANA_LINES=$(echo "$OUTPUT" | grep -iE -A5 'SAPHana|SAPHanaController|rsc_SAPHana')
     if [ -n "$HANA_LINES" ]; then
       if echo "$HANA_LINES" | grep -qi '(maintenance)'; then
         echo "HANA_RESOURCE_STATE=maintenance"
       elif echo "$HANA_LINES" | grep -qi 'unmanaged'; then
         echo "HANA_RESOURCE_STATE=unmanaged"
       elif echo "$HANA_LINES" | grep -qiE 'Started|Master|Slave|Promoted|Unpromoted'; then
-        # Running takes precedence: ancillary resources (SAPHanaFil) may be
-        # disabled while the core controller resource is still operational.
-        echo "HANA_RESOURCE_STATE=running"
+        # Some instances are running. Check if other instances are stopped
+        # (but not intentionally disabled via target-role).
+        if echo "$HANA_LINES" | grep -iE 'Stopped|FAILED' | grep -qviE 'target-role|disabled'; then
+          echo "HANA_RESOURCE_STATE=partially_running"
+        else
+          echo "HANA_RESOURCE_STATE=running"
+        fi
       elif echo "$HANA_LINES" | grep -qiE 'target-role.*Stopped|Stopped.*disabled|\(disabled\)'; then
         echo "HANA_RESOURCE_STATE=disabled"
       elif echo "$HANA_LINES" | grep -qiE 'Stopped|FAILED'; then

@@ -952,7 +952,7 @@ def _render_hana_db_status(pdf, cluster_info):
         )
         db_status_info["Managed by Cluster"] = f"No ({reason})"
 
-    db_status_info["Resource State"] = resource_state
+    db_status_info["Resource State"] = resource_state.replace("_", " ")
 
     pdf.info_table(db_status_info)
     pdf.ln(3)

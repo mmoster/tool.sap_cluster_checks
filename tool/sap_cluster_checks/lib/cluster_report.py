@@ -62,7 +62,7 @@ class ClusterReportData:
     access_method: str = "unknown"  # ssh, sosreport, local, ansible
     used_cib_xml: bool = False  # True if parsed cib.xml (cluster was stopped)
     cluster_running: bool = True  # False if cluster services not running
-    hana_resource_state: str = None  # running/stopped/disabled/unmanaged/absent/unknown
+    hana_resource_state: str = None  # running/partially_running/stopped/disabled/unmanaged/absent/unknown
     hana_db_status: Dict[str, Any] = None  # HANA DB running state, managed flag, SR info
 
     # =========================================================================
