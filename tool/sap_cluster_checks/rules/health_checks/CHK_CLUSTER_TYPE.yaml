@@ -149,7 +149,10 @@ parser:
       regex: "clone-max[=:\"].*?(\\d+)"
       group: 1
     - name: majority_maker
-      regex: "(majority|qdevice|Majority)"
+      regex: "(majority|Majority)"
+      group: 0
+    - name: qdevice
+      regex: "(qdevice|Qdevice)"
       group: 0
     - name: majority_maker_node
       # live_cmd: "majority_maker_node=<hostname>"; SOSreport pcs_config: "avoids node '<hostname>'"

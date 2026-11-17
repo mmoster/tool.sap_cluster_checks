@@ -1,12 +1,18 @@
 # CHK_QUORUM_CONFIG - Validate quorum configuration
+#
+# Applies to ALL cluster topologies (Scale-Up and Scale-Out).
+# Scale-Up typically uses two_node: 1; Scale-Out uses expected_votes
+# matching the node count. A quorum device (qdevice/qnetd) may be
+# present in either topology to provide an additional vote.
+#
 check_id: CHK_QUORUM_CONFIG
-version: "1.0"
+version: "1.1"
 severity: CRITICAL
 description: Validate quorum configuration
 enabled: true
 
 source_definitions:
-  live_cmd: "cat /etc/corosync/corosync.conf 2>/dev/null | grep -E 'two_node|wait_for_all|expected_votes|quorum' || corosync-quorumtool -s 2>/dev/null | head -10"
+  live_cmd: "cat /etc/corosync/corosync.conf 2>/dev/null || corosync-quorumtool -s 2>/dev/null | head -20"
   sos_path: "etc/corosync/corosync.conf"
 
 parser:
@@ -24,6 +30,10 @@ parser:
       group: 0
     - name: quorum_section
       regex: "quorum\\s*\\{"
+      group: 0
+    - name: qdevice
+      # Detect quorum device configuration (device { model: net ... })
+      regex: "(device\\s*\\{)"
       group: 0
 
 validation_logic:
@@ -45,3 +55,6 @@ validation_logic:
     - key: wait_for_all
       operator: info_if_exists
       pass_message: "Quorum: ${wait_for_all}"
+    - key: qdevice
+      operator: info_if_exists
+      pass_message: "Quorum device (qdevice) configured"

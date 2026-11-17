@@ -12,6 +12,7 @@ def _parsed(**overrides):
         "saphana_topology": None,
         "majority_maker": None,
         "majority_maker_node": None,
+        "qdevice": None,
         "clone_max": "2",
         "site_hosts_count": None,
         "sidadm_user": None,
@@ -101,14 +102,16 @@ class TestScaleOut:
         assert "verified" in result.message
         assert "3 HANA instances per site" in result.message
 
-    def test_scale_out_without_majority_maker_warning(self):
+    def test_scale_out_without_mm_or_qdevice(self):
+        """Scale-Out without MM or qdevice is noted but not a WARNING."""
         result = _detect(_parsed(
             node_count="4",
             clone_max="4",
         ))
         assert result.details["cluster_type"] == "Scale-Out"
         assert result.details["has_majority_maker"] is False
-        assert "no majority maker" in result.message.lower()
+        assert result.details["has_qdevice"] is False
+        assert "no majority maker or quorum device" in result.message.lower()
 
     def test_scale_out_hdbnsutil_failed(self):
         result = _detect(_parsed(
@@ -330,3 +333,62 @@ class TestInferredFromHanaTopology:
         ))
         assert result.details["cluster_type"] == "Single Node"
         assert "inferred_from_hana_topology" not in result.details
+
+
+class TestQdevice:
+    """Quorum device is independent of majority maker and works in any topology."""
+
+    def test_scale_up_with_qdevice(self):
+        """Scale-Up with quorum device configured."""
+        result = _detect(_parsed(qdevice="qdevice"))
+        assert result.details["cluster_type"] == "Scale-Up"
+        assert result.details["has_qdevice"] is True
+        assert "quorum device" in result.message.lower()
+
+    def test_scale_up_without_qdevice(self):
+        """Scale-Up without quorum device - no mention of qdevice."""
+        result = _detect(_parsed())
+        assert result.details["cluster_type"] == "Scale-Up"
+        assert result.details["has_qdevice"] is False
+        assert "quorum device" not in result.message.lower()
+
+    def test_scale_out_with_qdevice_no_mm(self):
+        """Scale-Out with quorum device but no majority maker - valid config."""
+        result = _detect(_parsed(
+            node_count="4",
+            clone_max="4",
+            qdevice="qdevice",
+        ))
+        assert result.details["cluster_type"] == "Scale-Out"
+        assert result.details["has_majority_maker"] is False
+        assert result.details["has_qdevice"] is True
+        assert "quorum device" in result.message.lower()
+        # Should NOT warn about missing MM when qdevice is present
+        assert "no majority maker" not in result.message.lower()
+
+    def test_scale_out_with_mm_and_qdevice(self):
+        """Scale-Out with both majority maker and quorum device."""
+        result = _detect(_parsed(
+            node_count="5",
+            clone_max="4",
+            majority_maker="has_constraint",
+            majority_maker_node="mm1",
+            qdevice="qdevice",
+        ))
+        assert result.details["cluster_type"] == "Scale-Out"
+        assert result.details["has_majority_maker"] is True
+        assert result.details["has_qdevice"] is True
+        # MM takes precedence in message
+        assert "majority maker" in result.message.lower()
+
+    def test_qdevice_not_treated_as_majority_maker(self):
+        """qdevice alone should NOT set has_majority_maker to True."""
+        result = _detect(_parsed(
+            node_count="4",
+            clone_max="4",
+            qdevice="qdevice",
+            majority_maker=None,
+            majority_maker_node=None,
+        ))
+        assert result.details["has_majority_maker"] is False
+        assert result.details["has_qdevice"] is True

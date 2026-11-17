@@ -38,7 +38,6 @@ steps:
           - check_id: CHK_SETUP_VALIDATION
           - check_id: CHK_CLONE_CONFIG
           - check_id: CHK_QUORUM_CONFIG
-            topology: [Scale-Up]
 
   pacemaker:
     name: "Pacemaker/Corosync"

@@ -792,13 +792,16 @@ class RulesEngine:
 
         Configuration types:
         - Scale-Up: 2 HANA instances (1 per site), clone-max=2
-        - Scale-Out: 4+ HANA instances (2+ per site), clone-max>2, has majority maker
+        - Scale-Out: 4+ HANA instances (2+ per site), clone-max>2
 
         IMPORTANT: SAPHanaController can be used for BOTH Scale-Up and Scale-Out.
         The definitive indicator is clone-max value, NOT the resource agent type.
         hdbnsutil -sr_state validates actual HANA topology (2+ hosts per site = Scale-Out).
 
-        Majority maker detection: by location constraints (primary) or name pattern.
+        Majority maker vs. quorum device:
+        - Majority maker: extra Pacemaker node without HANA (Scale-Out only)
+        - Quorum device (qdevice/qnetd): Corosync-level vote (any topology)
+        Both are valid tie-breaker strategies; they are independent and can coexist.
         """
         # Extract parsed values
         node_count_str = parsed.get("node_count")
@@ -806,6 +809,7 @@ class RulesEngine:
         saphana_controller = parsed.get("saphana_controller")  # SAPHanaController_* = can be either
         majority_maker = parsed.get("majority_maker")
         majority_maker_node = parsed.get("majority_maker_node")  # Actual node name
+        qdevice = parsed.get("qdevice")  # Quorum device (independent of MM)
         clone_max_str = parsed.get("clone_max")
 
         # hdbnsutil -sr_state output for Scale-Out validation
@@ -830,6 +834,7 @@ class RulesEngine:
         has_controller = saphana_controller is not None
         has_topology = parsed.get("saphana_topology") is not None
         has_hana_resource = has_saphana or has_controller or has_topology
+        has_qdevice = qdevice is not None
         # Detect if location constraints exclude a node from HANA resources
         # This could indicate a majority maker (Scale-Out) OR an app server (Scale-Up)
         has_constraint_excluded_node = (
@@ -849,15 +854,17 @@ class RulesEngine:
 
         # SAP HANA Scale-Out architecture:
         #   - At least 2 HANA instances per site (minimum 4 total = clone-max >= 4)
-        #   - Minimum 5 nodes: 4 HANA nodes + 1 majority maker
+        #   - Typically has a majority maker node (tie-breaker) OR a quorum device
         #   - Majority maker has constraints excluding SAPHanaTopology + SAPHanaController
         #
         # SAP HANA Scale-Up architecture:
         #   - Exactly 1 HANA instance per site (clone-max = 2)
         #   - May have additional app server nodes in the cluster
         #   - App servers may have HANA exclusion constraints (NOT majority makers)
+        #   - May optionally use a quorum device
         #
         # Key rule: Majority maker ONLY exists in Scale-Out (clone-max >= 4)
+        # Quorum device can exist in ANY topology (Scale-Up or Scale-Out)
         is_scale_out = clone_max >= 4
         has_majority_maker = is_scale_out and has_constraint_excluded_node
 
@@ -869,6 +876,7 @@ class RulesEngine:
             "has_saphana_controller": has_controller,
             "has_majority_maker": has_majority_maker,
             "majority_maker_node": majority_maker_node if has_majority_maker else None,
+            "has_qdevice": has_qdevice,
             "hdbnsutil_host_count": hdbnsutil_host_count,
             "hdbnsutil_confirms_scaleout": hdbnsutil_confirms_scaleout,
             "sidadm_user": sidadm_user,
@@ -876,9 +884,9 @@ class RulesEngine:
         }
 
         # Decision tree:
-        # 1. HANA resources + clone-max → definitive type (clone-max >= 4 = Scale-Out, < 4 = Scale-Up)
-        # 2. No HANA resources + hdbnsutil data → inferred type from HANA topology
-        # 3. No HANA resources + no hdbnsutil → Unknown
+        # 1. HANA resources + clone-max -> definitive type (clone-max >= 4 = Scale-Out, < 4 = Scale-Up)
+        # 2. No HANA resources + hdbnsutil data -> inferred type from HANA topology
+        # 3. No HANA resources + no hdbnsutil -> Unknown
         # 4. node_count is informational, not required for type detection
         if not has_hana_resource:
             if node_count == 0:
@@ -916,8 +924,17 @@ class RulesEngine:
                 base_message = (
                     f"Scale-Out configuration ({hana_nodes} HANA nodes + majority maker{mm_info})"
                 )
+            elif has_qdevice:
+                # No majority maker but has quorum device - valid configuration
+                base_message = (
+                    f"Scale-Out configuration ({hana_nodes} HANA nodes, quorum device configured)"
+                )
             else:
-                base_message = f"Scale-Out configuration ({hana_nodes} HANA nodes) - WARNING: no majority maker detected"
+                # Neither MM nor qdevice - informational note (not necessarily an error)
+                base_message = (
+                    f"Scale-Out configuration ({hana_nodes} HANA nodes)"
+                    " - no majority maker or quorum device detected"
+                )
 
             # Validate with hdbnsutil -sr_state
             if hdbnsutil_failed:
@@ -938,14 +955,18 @@ class RulesEngine:
             cluster_type = "Scale-Up"
             extra_nodes = max(0, node_count - clone_max) if node_count > 0 else 0
             if node_count in (2, 0):
-                message = f"Scale-Up configuration ({clone_max} HANA nodes)"
+                base_msg = f"Scale-Up configuration ({clone_max} HANA nodes)"
             elif extra_nodes > 0 and has_constraint_excluded_node:
                 # Extra node with HANA exclusion constraints = app server, NOT majority maker
-                message = f"Scale-Up configuration ({clone_max} HANA nodes, {extra_nodes} app server node(s))"
+                base_msg = f"Scale-Up configuration ({clone_max} HANA nodes, {extra_nodes} app server node(s))"
             elif extra_nodes > 0:
-                message = f"Scale-Up configuration ({clone_max} HANA nodes, {extra_nodes} additional node(s))"
+                base_msg = f"Scale-Up configuration ({clone_max} HANA nodes, {extra_nodes} additional node(s))"
             else:
-                message = f"Scale-Up configuration ({clone_max} HANA nodes)"
+                base_msg = f"Scale-Up configuration ({clone_max} HANA nodes)"
+            if has_qdevice:
+                message = f"{base_msg}, quorum device configured"
+            else:
+                message = base_msg
             details["hana_nodes"] = clone_max
 
         details["cluster_type"] = cluster_type
