@@ -157,14 +157,14 @@ class InstallStatusMixin:
                     match = re.search(r"Online:\s*\[\s*(.*?)\s*\]", content)
                     if match:
                         status["cluster_nodes"] = [
-                            n.strip() for n in match.group(1).split() if n.strip()
+                            n for n in match.group(1).split()
+                            if n and not re.match(r"\(\d+\)", n)
                         ]
                     standby_match = re.search(r"Standby:\s*\[\s*(.*?)\s*\]", content)
                     if standby_match:
                         status["standby_nodes"] = [
-                            n.strip()
-                            for n in standby_match.group(1).split()
-                            if n.strip()
+                            n for n in standby_match.group(1).split()
+                            if n and not re.match(r"\(\d+\)", n)
                         ]
 
                 # New pcs status format: "Node nodename (id): online|standby"
@@ -518,7 +518,10 @@ class InstallStatusMixin:
             ]:
                 match = re.search(rf"{category}:\s*\[\s*(.*?)\s*\]", output)
                 if match:
-                    status[key] = [n.strip() for n in match.group(1).split() if n.strip()]
+                    status[key] = [
+                        n for n in match.group(1).split()
+                        if n and not re.match(r"\(\d+\)", n)
+                    ]
                 else:
                     # [ \t]* instead of \s* to avoid crossing newlines into
                     # "Standby with resource(s)..." or "Pacemaker Remote Nodes:"
