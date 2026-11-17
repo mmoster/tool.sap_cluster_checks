@@ -1177,6 +1177,41 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         # Cross-check: detect HANA still running on standby nodes
         self._detect_phantom_stopped_resources()
 
+    def _adjust_severity_for_standby(self):
+        """Downgrade CRITICAL to WARNING when standby nodes explain the failure.
+
+        When a node is in standby, the missing unpromoted/secondary instance is
+        an expected consequence - not an unexplained critical condition.  The
+        check results stay FAILED (the HA degradation is real) but the severity
+        is lowered to WARNING so it doesn't overshadow truly critical findings.
+        """
+        if not self._standby_nodes:
+            return
+
+        standby_info = ", ".join(self._standby_nodes)
+        downgrade_checks = {"CHK_PROMOTED_ROLES", "CHK_SITE_ROLES"}
+        # Keywords that indicate the failure is about a missing secondary/unpromoted
+        standby_keywords = {"unpromoted", "failover", "secondary", "no primary"}
+
+        for result in self.check_results:
+            if result.check_id not in downgrade_checks:
+                continue
+            if result.status != CheckStatus.FAILED:
+                continue
+            if result.severity != Severity.CRITICAL:
+                continue
+
+            msg_lower = (result.message or "").lower()
+            if any(kw in msg_lower for kw in standby_keywords):
+                result.severity = Severity.WARNING
+                result.message += (
+                    f" (expected: node {standby_info} is in standby)"
+                )
+                self._debug_print(
+                    f"Downgraded {result.check_id} from CRITICAL to WARNING "
+                    f"(standby nodes: {standby_info})"
+                )
+
     def _detect_phantom_stopped_resources(self):
         """Detect HANA processes still running on standby nodes.
 
@@ -1499,6 +1534,9 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
         # Step 4: SAP Check
         if "sap" not in skip_steps:
             results["sap"] = self.step_sap_check()
+
+        # Adjust severity for checks whose failures are explained by standby nodes
+        self._adjust_severity_for_standby()
 
         # Step 5: Generate Report
         if "report" not in skip_steps:

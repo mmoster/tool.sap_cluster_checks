@@ -1329,32 +1329,73 @@ def _render_recommendations(pdf, failed_checks, warning_checks):
         priority += 1
 
     all_failed = failed_checks + warning_checks
-    if any(
-        c.get("check_id") in ["CHK_PROMOTED_ROLES", "CHK_SITE_ROLES"] for c in all_failed
-    ):
-        pdf.recommendation_box(
-            str(priority),
-            "HA Degraded - No Failover Target",
-            "The cluster has no secondary/unpromoted HANA instance. "
-            "Automatic failover is not possible. Check if a node is in standby "
-            "or if System Replication is broken.",
-            [
-                "# Diagnose: check node and replication status\n"
-                "pcs status nodes\n"
-                "SAPHanaSR-showAttr",
-                "# Remediate (if node is in standby):\n"
-                "# pcs node unstandby <node>",
-                "# After remediation, re-check:\n"
-                "# ./sap_cluster_checks.py -D",
-            ],
-        )
+
+    # Detect whether standby nodes are the root cause of downstream failures.
+    # CHK_NODE_STATUS warning + CHK_PROMOTED_ROLES/CHK_SITE_ROLES failure
+    # together mean "standby caused the missing failover target".
+    has_standby = any(
+        c.get("check_id") == "CHK_NODE_STATUS"
+        and "standby" in (c.get("message") or "").lower()
+        for c in all_failed
+    )
+    has_no_failover = any(
+        c.get("check_id") in ["CHK_PROMOTED_ROLES", "CHK_SITE_ROLES"]
+        for c in all_failed
+    )
+
+    if has_no_failover:
+        if has_standby:
+            # Standby is the known root cause - provide targeted guidance
+            pdf.recommendation_box(
+                str(priority),
+                "HA Degraded - Node in Standby",
+                "A cluster node is in standby mode, which caused Pacemaker to "
+                "remove the HANA secondary/unpromoted instance. Automatic failover "
+                "is not possible while the node remains in standby. "
+                "This also explains the missing failover target in "
+                "CHK_PROMOTED_ROLES / CHK_SITE_ROLES.",
+                [
+                    "# Diagnose: check node and replication status\n"
+                    "pcs status nodes\n"
+                    "SAPHanaSR-showAttr",
+                    "# Remediate: bring the standby node back online\n"
+                    "pcs node unstandby <node>",
+                    "# After remediation, re-check:\n"
+                    "# ./sap_cluster_checks.py -D",
+                ],
+            )
+        else:
+            # No standby detected - generic guidance
+            pdf.recommendation_box(
+                str(priority),
+                "HA Degraded - No Failover Target",
+                "The cluster has no secondary/unpromoted HANA instance. "
+                "Automatic failover is not possible. Check if a node is in standby "
+                "or if System Replication is broken.",
+                [
+                    "# Diagnose: check node and replication status\n"
+                    "pcs status nodes\n"
+                    "SAPHanaSR-showAttr",
+                    "# Remediate (if node is in standby):\n"
+                    "# pcs node unstandby <node>",
+                    "# After remediation, re-check:\n"
+                    "# ./sap_cluster_checks.py -D",
+                ],
+            )
         priority += 1
 
     if any(c.get("check_id") == "CHK_NODE_STATUS" for c in all_failed):
+        standby_detail = ""
+        if has_no_failover:
+            standby_detail = (
+                " This is the root cause for the degraded HA status "
+                "(missing failover target) reported above."
+            )
         pdf.recommendation_box(
             str(priority),
             "Cluster Node Offline or in Standby",
-            "One or more cluster nodes are not online, reducing cluster redundancy.",
+            "One or more cluster nodes are not online, reducing cluster "
+            "redundancy." + standby_detail,
             [
                 "# Diagnose: check node status\npcs status nodes",
                 "# Remediate (if node is in standby):\n"
