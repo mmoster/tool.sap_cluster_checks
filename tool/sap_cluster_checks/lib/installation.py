@@ -448,6 +448,25 @@ COMMON ISSUES & SOLUTIONS
      - Cluster may not be running: pcs status
      - Start cluster: pcs cluster start --all
 
+  4. Node in Standby
+     - A standby node is intentional (e.g., maintenance) or accidental
+     - Check: pcs status nodes
+     - Remove standby: pcs node unstandby <node>
+     - Impact: Pacemaker stops managing resources on that node. HANA checks
+       (SR detail, process status, landscape) are skipped on standby nodes.
+       Promoted/site role checks report WARNING instead of CRITICAL since
+       the missing secondary is expected during standby.
+     - If standby was unintentional, unstandby the node and re-run checks.
+
+  5. Node Offline
+     - Check if node is reachable: ssh <node> hostname
+     - Check cluster communication: corosync-cfgtool -s
+     - Verify corosync on that node: systemctl status corosync
+     - Start cluster on node: pcs cluster start <node>
+     - If the node is permanently removed, update expected_votes in
+       /etc/corosync/corosync.conf and clean up the cluster:
+       pcs cluster node remove <node>
+
 COMMANDS TO CHECK
 -----------------
   # Cluster status
@@ -506,7 +525,15 @@ COMMON ISSUES & SOLUTIONS
      - Check resource config: pcs resource show <resource>
      - Start resource: pcs resource enable <resource>
 
-  4. Split-Brain Risk
+  4. Missing Unpromoted/Secondary (Node in Standby)
+     - If a node is in standby, the secondary HANA instance is expected
+       to be missing. This is reported as WARNING, not CRITICAL.
+     - Check: pcs status nodes
+     - Resolve: pcs node unstandby <node>
+     - After unstandby, Pacemaker will re-manage the HANA resource and
+       System Replication should resume automatically.
+
+  5. Split-Brain Risk
      - Ensure STONITH is working
      - Test fencing: pcs stonith fence <node> --off
 
