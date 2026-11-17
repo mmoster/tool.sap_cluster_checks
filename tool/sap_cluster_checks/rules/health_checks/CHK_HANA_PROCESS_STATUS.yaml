@@ -17,6 +17,7 @@ check_id: CHK_HANA_PROCESS_STATUS
 version: "1.0"
 severity: WARNING
 optional: true
+skip_standby: true
 description: SAP HANA process health status
 enabled: true
 

@@ -66,6 +66,7 @@ class RuleDefinition:
     enabled: bool = True
     optional: bool = False  # If True, failures are warnings in non-strict mode
     hana_nodes_only: bool = False  # If True, skip majority maker nodes (no HANA)
+    skip_standby: bool = False  # If True, skip nodes in standby (resource not managed)
     source_definitions: Dict[str, Any] = None
     parser: Dict[str, Any] = None
     validation_logic: Dict[str, Any] = None
@@ -317,6 +318,8 @@ class RulesEngine:
         self._detected_topology: Optional[str] = None
         # Nodes confirmed to not have HANA (from CHK_HANA_INSTALLED)
         self._non_hana_nodes: set = set()
+        # Nodes in standby (from CHK_NODE_STATUS)
+        self._standby_nodes: set = set()
 
     def set_hana_resource_state(self, state: str):
         """Set the HANA resource state detected by CHK_RESOURCE_STATUS."""
@@ -337,6 +340,10 @@ class RulesEngine:
     def set_non_hana_nodes(self, nodes: set):
         """Set nodes confirmed to not have HANA (from CHK_HANA_INSTALLED)."""
         self._non_hana_nodes = nodes
+
+    def set_standby_nodes(self, nodes: set):
+        """Set nodes in standby (from CHK_NODE_STATUS)."""
+        self._standby_nodes = nodes
 
     def get_summary(self) -> Dict[str, Any]:
         """Summarize check results into counts and failure lists."""
@@ -469,6 +476,7 @@ class RulesEngine:
                     enabled=data.get("enabled", True),
                     optional=data.get("optional", False),
                     hana_nodes_only=data.get("hana_nodes_only", False),
+                    skip_standby=data.get("skip_standby", False),
                     source_definitions=data.get("source_definitions", {}),
                     parser=data.get("parser", {}),
                     validation_logic=data.get("validation_logic", {}),
@@ -1860,6 +1868,20 @@ class RulesEngine:
                             status=CheckStatus.SKIPPED,
                             severity=Severity[rule.severity],
                             message="Node excluded from HANA resources by constraints",
+                            node=node_name,
+                        )
+                    )
+                    continue
+
+                # Skip standby nodes for checks that require managed HANA resources
+                if rule.skip_standby and node_name in self._standby_nodes:
+                    results.append(
+                        CheckResult(
+                            check_id=rule.check_id,
+                            description=rule.description,
+                            status=CheckStatus.SKIPPED,
+                            severity=Severity.INFO,
+                            message="Node is in standby - HANA resource not managed by Pacemaker",
                             node=node_name,
                         )
                     )

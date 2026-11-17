@@ -16,6 +16,7 @@ check_id: CHK_HANA_SR_DETAIL
 version: "1.0"
 severity: WARNING
 optional: true
+skip_standby: true
 description: SAP HANA System Replication details (mode, status, backlog)
 enabled: true
 

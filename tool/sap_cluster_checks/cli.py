@@ -992,6 +992,8 @@ class ClusterHealthCheck(InstallStatusMixin, InstallGuideMixin, HanaStatusMixin)
                 self._debug_print(
                     f"Standby nodes detected: {', '.join(self._standby_nodes)}"
                 )
+                if self.rules_engine:
+                    self.rules_engine.set_standby_nodes(set(self._standby_nodes))
 
     def _post_pacemaker_phase1(self, results: list):
         """After pacemaker phase 1: extract HANA resource state and majority maker."""

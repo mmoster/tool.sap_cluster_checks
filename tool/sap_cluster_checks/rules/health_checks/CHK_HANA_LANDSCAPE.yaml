@@ -20,6 +20,7 @@ check_id: CHK_HANA_LANDSCAPE
 version: "1.0"
 severity: WARNING
 optional: true
+skip_standby: true
 description: SAP HANA landscape topology (Scale-Up vs Scale-Out)
 enabled: true
 

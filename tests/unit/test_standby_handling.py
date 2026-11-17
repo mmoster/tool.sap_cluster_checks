@@ -1,8 +1,10 @@
-"""Tests for standby node handling: severity adjustment and report context."""
+"""Tests for standby node handling: severity adjustment, report context, engine skip."""
 
 import pytest
 
-from tool.sap_cluster_checks.rules.engine import CheckResult, CheckStatus, Severity
+from tool.sap_cluster_checks.rules.engine import (
+    CheckResult, CheckStatus, RuleDefinition, RulesEngine, Severity,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -246,3 +248,109 @@ class TestReportRecommendationContext:
         )
         assert has_standby is True
         assert has_no_failover is True
+
+
+# ---------------------------------------------------------------------------
+# Engine-level standby node skipping (skip_standby flag)
+# ---------------------------------------------------------------------------
+
+class TestEngineStandbySkip:
+    """Test that the engine skips standby nodes for checks with skip_standby=True."""
+
+    def test_rule_definition_defaults_skip_standby_false(self):
+        rule = RuleDefinition(check_id="CHK_TEST")
+        assert rule.skip_standby is False
+
+    def test_rule_definition_accepts_skip_standby_true(self):
+        rule = RuleDefinition(check_id="CHK_TEST", skip_standby=True)
+        assert rule.skip_standby is True
+
+    def test_set_standby_nodes(self):
+        engine = RulesEngine()
+        engine.set_standby_nodes({"node1", "node2"})
+        assert engine._standby_nodes == {"node1", "node2"}
+
+    def test_set_standby_nodes_empty(self):
+        engine = RulesEngine()
+        engine.set_standby_nodes(set())
+        assert engine._standby_nodes == set()
+
+    def test_skip_standby_skips_node_in_run_check(self):
+        """A check with skip_standby=True should SKIP on standby nodes."""
+        engine = RulesEngine()
+        engine.set_standby_nodes({"dc2hana2"})
+
+        rule = RuleDefinition(
+            check_id="CHK_TEST_SKIP",
+            severity="WARNING",
+            description="Test check",
+            skip_standby=True,
+            source_definitions={"live_cmd": "echo test"},
+            parser={"type": "regex", "search_patterns": []},
+            validation_logic={"expectations": []},
+        )
+
+        nodes = {
+            "dc1hana1": {"preferred_method": "ssh", "ssh_user": "root"},
+            "dc2hana2": {"preferred_method": "ssh", "ssh_user": "root"},
+        }
+
+        results = engine.run_check(rule, nodes)
+
+        # dc2hana2 should be SKIPPED
+        standby_results = [r for r in results if r.node == "dc2hana2"]
+        assert len(standby_results) == 1
+        assert standby_results[0].status == CheckStatus.SKIPPED
+        assert "standby" in standby_results[0].message
+
+    def test_no_skip_when_flag_false(self):
+        """A check with skip_standby=False should NOT skip standby nodes."""
+        engine = RulesEngine()
+        engine.set_standby_nodes({"dc2hana2"})
+
+        rule = RuleDefinition(
+            check_id="CHK_TEST_NOSKIP",
+            severity="WARNING",
+            description="Test check",
+            skip_standby=False,
+            source_definitions={"live_cmd": "echo test"},
+            parser={"type": "regex", "search_patterns": []},
+            validation_logic={"expectations": []},
+        )
+
+        nodes = {
+            "dc2hana2": {"preferred_method": "ssh", "ssh_user": "root"},
+        }
+
+        results = engine.run_check(rule, nodes)
+
+        # Should NOT be skipped (may fail due to no SSH, but not SKIPPED for standby)
+        standby_results = [r for r in results if r.node == "dc2hana2"]
+        assert len(standby_results) == 1
+        assert "standby" not in (standby_results[0].message or "")
+
+    def test_no_skip_when_node_not_standby(self):
+        """Non-standby nodes should not be skipped even if skip_standby=True."""
+        engine = RulesEngine()
+        engine.set_standby_nodes({"dc2hana2"})
+
+        rule = RuleDefinition(
+            check_id="CHK_TEST_OTHER",
+            severity="WARNING",
+            description="Test check",
+            skip_standby=True,
+            source_definitions={"live_cmd": "echo test"},
+            parser={"type": "regex", "search_patterns": []},
+            validation_logic={"expectations": []},
+        )
+
+        nodes = {
+            "dc1hana1": {"preferred_method": "ssh", "ssh_user": "root"},
+        }
+
+        results = engine.run_check(rule, nodes)
+
+        # dc1hana1 is not in standby, should not be skipped for standby reasons
+        assert len(results) == 1
+        if results[0].status == CheckStatus.SKIPPED:
+            assert "standby" not in (results[0].message or "")
