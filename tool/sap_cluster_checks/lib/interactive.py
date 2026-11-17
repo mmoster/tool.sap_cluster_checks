@@ -17,7 +17,67 @@ except ImportError:
     yaml = None
 
 from .utils import scan_for_resources, extract_sosreports_parallel
-from .installation import print_guide
+from .installation import print_guide, print_suggestions
+
+# Input values recognized as a request for troubleshooting tips
+_SUGGEST_INPUTS = {"t", "tips", "suggest", "suggestion", "--suggest"}
+
+
+def _show_suggest_tips(config_path: Path):
+    """Show suggestion tips based on last run status, or explain why none are available."""
+    config_dir = config_path.parent
+    status_file = config_dir / "last_run_status.yaml"
+
+    if not status_file.exists():
+        print("\nNo previous health check run found.")
+        print("Run a health check first, then tips will show suggestions for failing steps.")
+        print("\nYou can also get tips for a specific step:")
+        print("  ./sap_cluster_checks.py --suggest config")
+        print("  ./sap_cluster_checks.py --suggest pacemaker")
+        print("  ./sap_cluster_checks.py --suggest sap")
+        print("  ./sap_cluster_checks.py --suggest all")
+        return
+
+    if not yaml:
+        print("\nCannot read status file: PyYAML not available.")
+        return
+
+    try:
+        with open(status_file, "r", encoding="utf-8") as f:
+            status = yaml.safe_load(f) or {}
+    except Exception:
+        print("\nCould not read last run status.")
+        return
+
+    failed_steps = status.get("failed_steps", [])
+    if not failed_steps:
+        print("\nAll steps passed in the last run - no troubleshooting suggestions needed.")
+        print("\nFor general tips, run: ./sap_cluster_checks.py --suggest all")
+        return
+
+    step = failed_steps[0]
+    print(f"\nFirst failing step: {step}")
+    if len(failed_steps) > 1:
+        others = ", ".join(failed_steps[1:])
+        print(f"Other failing steps: {others}")
+    print()
+
+    # Determine RHEL major version for documentation URLs
+    rhel_major = 9
+    try:
+        access_config = config_dir / "cluster_access_config.yaml"
+        if access_config.exists():
+            with open(access_config, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            for node_info in (data.get("nodes") or {}).values():
+                v = node_info.get("rhel_major")
+                if v:
+                    rhel_major = int(v)
+                    break
+    except Exception:
+        pass
+
+    print_suggestions(step, rhel_major)
 
 
 def interactive_startup(config_path: Path) -> tuple:
@@ -162,6 +222,7 @@ USAGE EXAMPLES
             print("  [1-N]       Select a cluster by number")
             print("  [a]         Continue with all nodes")
             print("  [l]         Run in local mode (on this cluster node)")
+            print("  [t]         Show troubleshooting tips (--suggest)")
             print("  [nodes]     Enter different node names (space-separated)")
             print("  [d]         Delete reports and start fresh")
             print("  [q]         Quit")
@@ -186,6 +247,10 @@ USAGE EXAMPLES
 
             if response == "l":
                 return ["local"], True
+
+            if response in _SUGGEST_INPUTS:
+                _show_suggest_tips(config_path)
+                return None, False
 
             if response in ("a", ""):
                 return existing_nodes, True
@@ -220,6 +285,7 @@ USAGE EXAMPLES
         print("Options:")
         print("  [Enter]     Continue with these nodes")
         print("  [l]         Run in local mode (on this cluster node)")
+        print("  [t]         Show troubleshooting tips (--suggest)")
         print("  [nodes]     Enter different node names (space-separated)")
         print("  [d]         Delete reports and start fresh")
         print("  [q]         Quit")
@@ -231,6 +297,7 @@ USAGE EXAMPLES
             print("Options:")
             print("  [Enter]     Run in local mode (on this cluster node)  [default]")
             print("  [nodes]     Enter node names to check (space-separated)")
+            print("  [t]         Show troubleshooting tips (--suggest)")
             print("  [g]         Show usage guide (-G)")
             print("  [q]         Quit")
             print("-" * 63)
@@ -246,6 +313,10 @@ USAGE EXAMPLES
                 print()
                 print("-" * 63)
                 continue
+
+            if response in _SUGGEST_INPUTS:
+                _show_suggest_tips(config_path)
+                return None, False
 
             if response == "q":
                 print("Exiting.")
@@ -283,6 +354,10 @@ USAGE EXAMPLES
 
     if response == "l":
         return ["local"], True
+
+    if response in _SUGGEST_INPUTS:
+        _show_suggest_tips(config_path)
+        return None, False
 
     if response == "":
         # Continue with existing nodes
