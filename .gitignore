@@ -39,6 +39,9 @@ docs/BLOG_HOWTO.md
 docs/inject_into_template.py
 docs/generate_training_pptx.js
 
+# Keys / credentials
+github_keys.md
+
 # OS
 .DS_Store
 Thumbs.db
